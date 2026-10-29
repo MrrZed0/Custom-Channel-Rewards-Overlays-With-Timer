@@ -1,146 +1,177 @@
-⚡ Streamer.bot Channel Reward Overlay Studio & OBS Reward Dock
-![Streamer.bot](https://img.shields.io/badge/Streamer.bot-WebSocket%20Ready-10b981?style=for-the-badge&logo=twitch&logoColor=white)
-![Platforms](https://img.shields.io/badge/Platforms-Twitch%20%26%20Kick-9146FF?style=for-the-badge)
-![OBS Studio](https://img.shields.io/badge/OBS%20Studio-Overlay%20%26%20Custom%20Dock-302E31?style=for-the-badge&logo=obsstudio&logoColor=white)
-![Zero Dependencies](https://img.shields.io/badge/Single--File-HTML5%20%2F%20JS-06b6d4?style=for-the-badge)
-A complete, self-contained HTML5 suite powered by Streamer.bot WebSockets for managing and displaying Twitch and Kick Channel Point Rewards in OBS Studio.
-This project consists of two tools that work together seamlessly:
-🎨 OBS Channel Reward Overlay & Customizer Studio — Displays animated on-screen reward alerts, user avatars, and stacked countdown timers directly on your stream, and triggers automated Twitch/Kick chat announcements.
-📋 OBS Studio Channel Reward Dock Dashboard — A compact, real-time streamer dashboard inside OBS Studio with Green Active Bubbles, Red Deactivated Bubbles, Idle Timer Effects, Activated Timestamps, and 1-Click Hover Dismiss controls.
+<div align="center">
+
+# ⚡ Streamer.bot Channel Reward Overlay Studio & OBS Reward Dock
+
+[![Streamer.bot](https://img.shields.io/badge/Streamer.bot-WebSocket_Ready-10b981?style=for-the-badge&logo=twitch&logoColor=white)](https://streamer.bot/)
+[![Platforms](https://img.shields.io/badge/Platforms-Twitch_%26_Kick-9146FF?style=for-the-badge)](https://twitch.tv/)
+[![OBS Studio](https://img.shields.io/badge/OBS_Studio-Overlay_%26_Custom_Dock-302E31?style=for-the-badge&logo=obsstudio&logoColor=white)](https://obsproject.com/)
+[![License](https://img.shields.io/badge/Single--File-HTML5_%2F_JS-06b6d4?style=for-the-badge)](#)
+
+**A self-contained HTML5 suite powered by Streamer.bot WebSockets for displaying, tracking, and managing Twitch & Kick Channel Point Rewards inside OBS Studio.**
+
+[✨ Features](#-what-this-suite-does) • [⏱️ Timer Syntax](#️-automatic-timer-syntax) • [🚀 Setup Guide](#-how-to-set-up-step-by-step) • [💬 Chat Actions](#-setting-up-automated-chat-messages) • [🛠️ Troubleshooting](#️-troubleshooting)
+
+</div>
+
 ---
-📑 Table of Contents
-✨ Overview: What Each Tool Does
-1. OBS Channel Reward Overlay & Studio Customizer
-2. OBS Studio Reward Dock Dashboard
-⏱️ How Automatic Timer Detection Works
-🚀 Complete Setup Guide
-Step 1: Enable the Streamer.bot WebSocket Server
-Step 2: Add Timer Codes to Your Twitch / Kick Rewards
-Step 3: Add the Reward Dock to OBS Studio
-Step 4: Customize & Export the OBS Stream Overlay
-Step 5: Configure Automated Twitch & Kick Chat Messages
-Step 6: (Optional) Custom C# Broadcast Script
-🛠️ Troubleshooting
+
+> [!NOTE]
+> Both the **OBS Stream Overlay** and the **OBS Studio Dock Dashboard** are single-file `.html` applications with **zero external dependencies**. They connect directly to your local Streamer.bot WebSocket server (`ws://127.0.0.1:8080/`).
+
 ---
-✨ Overview: What Each Tool Does
-1. OBS Channel Reward Overlay & Studio Customizer
-The Overlay Studio gives you a live 16:9 interactive preview canvas to design your on-screen channel point alerts and countdown timers, then exports a single ready-to-use HTML file for your OBS Browser Source.
-Multi-Platform Support (Twitch & Kick): Automatically listens for `Twitch.RewardRedemption`, `Kick.RewardRedemption`, and custom Streamer.bot broadcasts.
-Clear Visual Hierarchy:
-Top: Channel Reward Title
-Middle: Channel Reward Description & User Input
-User Badge: Redeemer's Twitch or Kick Profile Picture, Username, and Platform Badge
-Automatic Countdown Timers & Smart Stacking:
-Scans the reward description for time codes like `(5:00)` or `(1:00:00)` and automatically spawns a live countdown card after/alongside the alert.
-If multiple timed rewards are active at once, the newest timed reward automatically moves to the top of the timer stack.
-600+ Built-In Visual & Audio Presets:
-108+ In/Out Motion Effects (plus a 🎲 Random on Every Alert & Timer toggle)
-108+ Alert Card Styles
-108+ Timer Card Styles
-108+ Master Display Layouts
-108+ Alert Notification Sounds & 108+ Timer Completion Sounds (WebAudio synthesized — no external MP3 files required)
-Flexible Screen Positioning & Timing:
-Choose from 9 screen anchor positions (Top-Left, Top-Center, Top-Right, Middle-Left, Center, Middle-Right, Bottom-Left, Bottom-Center, Bottom-Right).
-Set a Custom Alert Display Duration (e.g., `3s` to `600s`) with an optional visual countdown bar showing when the popup will disappear.
-Automated Chat Messages via Streamer.bot Actions:
-Select separate Streamer.bot Actions from a live dropdown for Twitch and Kick when a reward is Redeemed and when a Timer Finishes, passing formatted message arguments directly to Streamer.bot.
+
+## ✨ What This Suite Does
+
+This repository includes two tools designed to work together during your live streams:
+
+### 1. 🎨 OBS Channel Reward Overlay & Customizer Studio
+The **Overlay Studio** provides a live 16:9 interactive preview stage to customize your on-screen channel point alerts and countdown timers, and exports a single HTML file for your OBS Browser Source.
+
+- [x] **Twitch & Kick Support**: Listens to `Twitch.RewardRedemption`, `Kick.RewardRedemption`, and custom Streamer.bot broadcasts.
+- [x] **Clear Reward Hierarchy**:
+  - **Top**: Channel Reward Title
+  - **Under Title**: Channel Reward Description & Viewer Input
+  - **User Profile**: Redeemer's Twitch or Kick Profile Picture, Username, and Platform Badge
+- [x] **Automatic Countdown Timers & Top-Stacking**:
+  - Automatically scans reward descriptions for time codes like `(5:00)` or `(1:00:00)` and spawns a live countdown card.
+  - When multiple timed rewards are active, **the newest timed reward automatically moves to the top of the stack**.
+- [x] **600+ Built-In Presets**:
+  - **108+ In/Out Motion Effects** (with a **Random on Every Alert & Timer** toggle)
+  - **108+ Alert Card Styles** & **108+ Timer Card Styles**
+  - **108+ Master Display Layouts**
+  - **108+ Alert Sounds** & **108+ Timer Completion Sounds** (built-in WebAudio synthesizer)
+- [x] **9-Point Screen Positioning & Custom Alert Duration**:
+  - Anchor alerts to any corner, edge, or center of the screen.
+  - Set a custom **Alert Display Duration** (`1s` to `600s`) before the alert animates away.
+- [x] **Native Streamer.bot Chat Announcements**:
+  - Triggers your chosen Streamer.bot Actions for **Twitch** and **Kick** when a reward is redeemed and when a timer finishes.
+
 ---
-2. OBS Studio Reward Dock Dashboard
-The OBS Reward Dock is a lightweight, compact dashboard designed specifically for OBS Custom Browser Docks so you never miss or lose track of redeemed channel rewards while streaming.
-Bubble State	Visual Style	Behavior
-🟢 Active (Timed Reward)	Glowing Green Bubble + Idle Effect	Plays a smooth breathing emerald glow & shimmer wave while counting down (`MM:SS` or `HH:MM:SS`). Automatically turns Red when the timer hits `00:00`.
-🟢 Active (No Timer)	Glowing Green Bubble (`120s` Hold)	Stays Green at the top of the dock for 120 seconds (configurable) with a live `120s` countdown badge, then automatically turns Red.
-🔴 Not Active (Expired / Dismissed)	Deactivated Red Bubble	Moves below all active Green rewards so active tasks always remain pinned to the top.
-Key Dock Features:
-Pinned Top Priority: Every new reward enters at the top of the dock and pushes older rewards down, keeping all Green Active Bubbles grouped at the top above Red Deactivated Bubbles.
-Exact Activated Timestamp: Every card displays the exact time it was triggered (`🕒 5:25:14 PM`) alongside the platform badge (`TWITCH` / `KICK`), user avatar, username, reward title, and description.
-Hover Dismiss (`Turn Red`): Hover your mouse over any active Green bubble and click `Dismiss • Turn Red` to immediately mark the reward as completed/inactive.
-Hover Reactivate (`Turn Green`): Accidentally dismissed a reward? Hover over any Red bubble and click `Turn Green` to restart it, or click `✕` to remove it from the list.
-Clean Startup: Starts completely empty on reload—no demo clutter—and includes a collapsible Settings / Test drawer for quick testing.
+
+### 2. 📋 OBS Studio Channel Reward Dock Dashboard
+The **OBS Reward Dock** (`index.html`) is a compact dashboard built for **OBS Custom Browser Docks** so you can track active, timed, and completed channel rewards in real time.
+
+| Bubble State | Visual Appearance | How It Works |
+| :--- | :--- | :--- |
+| **🟢 Active (Timed)** | **Green Bubble + Idle Effect** | Displays a breathing emerald glow and shimmer animation while counting down (`MM:SS` or `HH:MM:SS`). Automatically turns **Red** when the timer reaches `00:00`. |
+| **🟢 Active (No Timer)** | **Green Bubble (`120s` Hold)** | Stays **Green** at the top of the dock for **120 seconds** with a live countdown badge, then automatically turns **Red**. |
+| **🔴 Not Active** | **Red Deactivated Bubble** | Expired or manually dismissed rewards turn **Red** and move below all active Green bubbles. |
+
+#### Key Dock Highlights:
+* **Top-Priority Sorting**: New rewards always insert at the top and push older rewards down, keeping all **Green Active Bubbles** grouped at the top above **Red Deactivated Bubbles**.
+* **Activated Timestamp**: Every card displays the exact time it was triggered (e.g., `5:25:14 PM`) next to the viewer's username, avatar, and platform badge.
+* **Hover to Dismiss (`Turn Red`)**: Hover your mouse over any active Green bubble and click <kbd>Dismiss • Turn Red</kbd> to immediately mark it as completed/not active.
+* **Hover to Reactivate (`Turn Green`)**: Hover over any Red bubble and click <kbd>Turn Green</kbd> to restart it, or click <kbd>✕</kbd> to remove it from the dock.
+* **Compact Layout & Clean Startup**: Designed with compact cards to fit narrow OBS docks and loads with a clean empty state on every startup.
+
 ---
-⏱️ How Automatic Timer Detection Works
-Both the OBS Overlay and the OBS Dock automatically scan your channel reward's description (or title) for a time value inside parentheses `(...)`.
-Time Code in Description	Meaning	Example Reward Description
-`(MM:SS)`	Minutes : Seconds	`Play with no HUD and inverted mouse! (5:00)` $\rightarrow$ 5m 00s timer
-`(HH:MM:SS)`	Hours : Minutes : Seconds	`Wear the banana suit on stream! (1:00:00)` $\rightarrow$ 1h 00m 00s timer
-`(H:M:S)`	Shorthand Hours : Mins : Secs	`Speak in an accent! (1:0:0)` $\rightarrow$ 1h 00m 00s timer
-No time code	Instant / Non-Timed Reward	`Hydrate and sit up straight!` $\rightarrow$ Shows alert (120s green hold in Dock)
+
+## ⏱️ Automatic Timer Syntax
+
+Both the **Overlay** and the **Dock** scan the end of your channel reward description (or title) for a time value inside parentheses `(...)`:
+
+| Format in Description | Duration Parsed | Example Channel Reward Description |
+| :---: | :---: | :--- |
+| `(MM:SS)` | **Minutes : Seconds** | `Play with no HUD and inverted mouse! (5:00)` |
+| `(HH:MM:SS)` | **Hours : Minutes : Seconds** | `Wear the banana suit on stream! (1:00:00)` |
+| `(H:M:S)` | **Hours : Minutes : Seconds** | `Speak in an accent! (1:0:0)` |
+| *(No parentheses)* | **No Timer (Instant Alert)** | `Hydrate and posture check!` |
+
+> [!TIP]
+> If a reward has **no timer code** in its description, the Stream Overlay shows the popup alert for your custom display duration, while the OBS Dock keeps the reward in a **Green Bubble for 120 seconds** before automatically turning it **Red**.
+
 ---
-🚀 Complete Setup Guide
-Prerequisites
-OBS Studio (v28 or newer recommended)
-Streamer.bot (v0.2.x or v1.0+) connected to your Twitch and/or Kick account
+
+## 🚀 How to Set Up (Step-by-Step)
+
+### Step 1: Enable the Streamer.bot WebSocket Server
+1. Open **Streamer.bot**.
+2. Go to <kbd>Servers/Clients</kbd> $\rightarrow$ <kbd>WebSocket Server</kbd>.
+3. Check **Auto Start WebSocket Server**.
+4. Set **Address** to `127.0.0.1` and **Port** to `8080`.
+5. Leave **Authentication** unchecked (for local OBS connections) and click <kbd>Start Server</kbd>.
+
 ---
-Step 1: Enable the Streamer.bot WebSocket Server
-Open Streamer.bot.
-Navigate to the `Servers/Clients` tab $\rightarrow$ `WebSocket Server`.
-Check `Auto Start WebSocket Server`.
-Set Address to `127.0.0.1` and Port to `8080` (the default `ws://127.0.0.1:8080/`).
-Ensure `Authentication` is unchecked (or localhost-accessible) and click `Start Server`.
----
-Step 2: Add Timer Codes to Your Twitch / Kick Rewards
-Open your Twitch Creator Dashboard (Viewer Rewards $\rightarrow$ Channel Points $\rightarrow$ Manage Rewards) or Kick Dashboard.
-For any reward that should trigger a countdown timer, add the duration in parentheses at the end of the Reward Description:
-5 Minutes: `Mute microphone for 5 minutes (5:00)`
-90 Seconds: `Drop primary weapon right now (1:30)`
-1 Hour: `Hardcore mode enabled (1:00:00)`
-Rewards without parentheses will behave as standard alerts (and stay Green for `120s` in the OBS Dock before turning Red).
----
-Step 3: Add the Reward Dock to OBS Studio
-Save the dock HTML file (`index.html` or click Save Dock HTML inside the dock header to download `streamerbot-obs-reward-dock.html`) to a permanent folder on your PC (e.g., `C:\OBS-Overlays\streamerbot-obs-reward-dock.html`).
-In OBS Studio, go to the top menu bar and click `Docks` $\rightarrow$ `Custom Browser Docks...`.
-Under Dock Name, enter:
-```text
-   Channel Rewards
+
+### Step 2: Add Timer Codes to Your Twitch or Kick Rewards
+1. Open your **Twitch Creator Dashboard** (<kbd>Viewer Rewards</kbd> $\rightarrow$ <kbd>Channel Points</kbd> $\rightarrow$ <kbd>Manage Rewards</kbd>) or **Kick Dashboard**.
+2. Edit any reward that needs a countdown timer and add `(MM:SS)` or `(HH:MM:SS)` to the end of its **Description**:
+   ```text
+   Mute my mic for 5 minutes! (5:00)
    ```
-Under URL, enter the local file path (or click `...` if available):
-```text
-   file:///C:/OBS-Overlays/streamerbot-obs-reward-dock.html
+
+---
+
+### Step 3: Add the Reward Dock to OBS Studio
+1. Save `index.html` (or click <kbd>Save Dock HTML</kbd> in the dock header to save `streamerbot-obs-reward-dock.html`) to a folder on your PC, for example:
+   ```text
+   C:\OBS-Overlays\streamerbot-obs-reward-dock.html
    ```
-Click `Apply`. The new dock window will open—drag and snap it anywhere into your OBS Studio layout!
-(Optional) Click `Settings / Test` at the top of the dock if your Streamer.bot WebSocket uses a custom port or if you want to adjust the default `120s` green hold time.
+2. Open **OBS Studio** and click <kbd>Docks</kbd> $\rightarrow$ <kbd>Custom Browser Docks...</kbd> in the top menu bar.
+3. Add a new row with the following details:
+   * **Dock Name**: `Channel Rewards`
+   * **URL**: `file:///C:/OBS-Overlays/streamerbot-obs-reward-dock.html`
+4. Click <kbd>Apply</kbd> and dock the panel anywhere inside your OBS workspace.
+
+> [!IMPORTANT]
+> Make sure to use forward slashes `/` in the `file:///` URL inside OBS Custom Browser Docks, or select the local file directly if your version of OBS includes the file browse button.
+
 ---
-Step 4: Customize & Export the OBS Stream Overlay
-Open the Overlay Customizer Studio in your browser.
-Position/WS Tab:
-Choose your Screen Anchor Position (e.g., `Top Right`, `Bottom Right`).
-Set your Alert Display Time (Seconds Before It Goes Away) (default: `6` seconds).
-100+ Styles & 100+ Timers/Effects Tabs:
-Select your favorite Master Layout, Alert Style, Timer Style, In/Out Animation (or enable 🎲 Random In/Out on Every Alert & Timer), Alert Sound, and Timer End Sound.
-Click `Export OBS Overlay HTML` in the top bar to download `streamerbot-reward-overlay.html`.
-In OBS Studio, under Sources, click `+` $\rightarrow$ `Browser`:
-Check `Local file` and select your downloaded `streamerbot-reward-overlay.html`.
-Set Width to `1920` and Height to `1080`.
-Click `OK`.
+
+### Step 4: Customize & Add the OBS Stream Overlay
+1. Open the **Overlay Customizer Studio** in your browser.
+2. Under the <kbd>Position/WS</kbd> tab:
+   * Select your **Screen Position** (e.g., `Top Right` or `Bottom Right`).
+   * Set **Alert Display Time (Before It Goes Away)** in seconds.
+3. Under <kbd>100+ Styles</kbd> and <kbd>100+ Timers & Effects</kbd>:
+   * Choose your **Master Layout**, **Alert Style**, **Timer Style**, **In/Out Motion Effect** (or enable **Random In/Out on Every Alert & Timer**), and **Sounds**.
+4. Click <kbd>Export OBS Overlay HTML</kbd> in the top bar to download `streamerbot-reward-overlay.html`.
+5. In **OBS Studio**, go to **Sources** $\rightarrow$ click <kbd>+</kbd> $\rightarrow$ <kbd>Browser</kbd>:
+   * Check **Local file** and select `streamerbot-reward-overlay.html`.
+   * Set **Width**: `1920` and **Height**: `1080`.
+   * Click <kbd>OK</kbd>.
+
 ---
-Step 5: Configure Automated Twitch & Kick Chat Messages
-The overlay can automatically announce in your Twitch or Kick chat when a reward is redeemed and when its timer finishes using native Streamer.bot Actions:
-In Streamer.bot, create an Action (or two separate Actions) such as:
-`Reward Redeemed Chat`
-`Reward Timer Finished Chat`
-Inside your Action, add a Sub-Action:
-For Twitch: `Twitch` $\rightarrow$ `Chat` $\rightarrow$ `Send Message to Channel`
-For Kick: `Kick` $\rightarrow$ `Chat` $\rightarrow$ `Send Message to Channel`
-In the message box of that Sub-Action, enter `%chatMessage%` (or `%rewardMessage%` for the redeemed action / `%timerMessage%` for the timer finished action).
-In the Overlay Studio under `Position/WS` $\rightarrow$ `Streamer.bot Chat Actions`:
-Click `Refresh` to load your Streamer.bot actions list.
-Select your actions in the dropdowns for Twitch and/or Kick.
-Customize your message templates:
-On Reward Redeemed: `{user} redeemed {reward} - {description}`
-On Timer Finished: `{reward} Is Over After {duration}`
-Available Arguments Passed to Streamer.bot `DoAction`:
-Argument Variable	Description	Example Output
-`%rewardMessage%`	Formatted "On Reward Redeemed" message	`KaiCenat redeemed No HUD - Play without HUD (5:00)`
-`%timerMessage%`	Formatted "On Timer Finished" message	`No HUD Is Over After 5 Mins`
-`%chatMessage%`	Always contains the active event's formatted message	(Matches either `%rewardMessage%` or `%timerMessage%`)
-`%user%`	Username of the viewer who triggered the reward	`KaiCenat`
-`%reward%`	Title of the channel reward	`No HUD`
-`%description%`	Description + user input of the reward	`Play without HUD (5:00)`
-`%duration%`	Human-readable timer length	`5 Mins`
-`%platform%`	Platform where the reward was triggered	`twitch` or `kick`
+
+## 💬 Setting Up Automated Chat Messages
+
+The overlay triggers native **Streamer.bot Actions** when a reward is redeemed and when its countdown timer finishes:
+
+1. In **Streamer.bot**, create two Actions (or one shared Action):
+   * `Reward Redeemed Chat`
+   * `Reward Timer Finished Chat`
+2. Add a Sub-Action inside each Action:
+   * **Twitch**: <kbd>Twitch</kbd> $\rightarrow$ <kbd>Chat</kbd> $\rightarrow$ <kbd>Send Message to Channel</kbd>
+   * **Kick**: <kbd>Kick</kbd> $\rightarrow$ <kbd>Chat</kbd> $\rightarrow$ <kbd>Send Message to Channel</kbd>
+3. Set the message text in the Sub-Action to `%chatMessage%` (or `%rewardMessage%` / `%timerMessage%`).
+4. In the **Overlay Studio** (<kbd>Position/WS</kbd> tab), click <kbd>Refresh</kbd> next to **Streamer.bot Chat Actions** and select your Actions from the dropdowns for:
+   * **Twitch • On Reward Redeemed Action**
+   * **Twitch • On Timer Finished Action**
+   * **Kick • On Reward Redeemed Action**
+   * **Kick • On Timer Finished Action**
+
+### Arguments Sent to Your Streamer.bot Action (`args`)
+
+| Argument Variable | Description | Example Value |
+| :--- | :--- | :--- |
+| `%rewardMessage%` | Formatted message when the reward is triggered | `KaiCenat redeemed No HUD - Play without HUD (5:00)` |
+| `%timerMessage%` | Formatted message when the countdown ends | `No HUD Is Over After 5 Mins` |
+| `%chatMessage%` | Always populated with the active message | Matches `%rewardMessage%` or `%timerMessage%` |
+| `%user%` | Username of the viewer who redeemed the reward | `KaiCenat` |
+| `%reward%` | Name of the channel reward | `No HUD` |
+| `%description%` | Description + user input of the reward | `Play without HUD (5:00)` |
+| `%duration%` | Human-readable timer duration | `5 Mins` |
+| `%platform%` | Platform identifier | `twitch` or `kick` |
+
 ---
-Step 6: (Optional) Custom C# Broadcast Script
-Both the Overlay and the Dock work out of the box with native Streamer.bot `Twitch.RewardRedemption` and `Kick.RewardRedemption` WebSocket events. However, if you want to trigger custom rewards from chat commands, bits, donations, or enrich user avatars server-side, you can add a `Execute C# Code` sub-action in Streamer.bot:
+
+<details>
+<summary><b>💻 Optional: Custom C# Broadcast Script for Streamer.bot (Click to Expand)</b></summary>
+
+<br>
+
+Both the Overlay and the Dock work automatically with native `Twitch.RewardRedemption` and `Kick.RewardRedemption` WebSocket events. If you also want to trigger rewards from chat commands, bits, or custom triggers, add an <kbd>Execute C# Code</kbd> Sub-Action in Streamer.bot with the following code:
+
 ```csharp
 using System;
 using System.Text.RegularExpressions;
@@ -189,12 +220,29 @@ public class CPHInline
     }
 }
 ```
+
+</details>
+
 ---
-🛠️ Troubleshooting
-WebSocket Status Shows `WS: Standby (127.0.0.1:8080)`:
-Verify Streamer.bot is running and the WebSocket Server is started under `Servers/Clients -> WebSocket Server`.
-If you changed your port in Streamer.bot, open `Settings / Test` in the Dock (or `Position/WS` in the Studio) and update the WebSocket URL to match your port.
-No Audio in OBS Studio:
-Right-click your Browser Source in OBS $\rightarrow$ `Properties` $\rightarrow$ check `Control audio via OBS`, then set Audio Monitoring to `Monitor and Output` in OBS Advanced Audio Properties.
-Timer Did Not Start:
-Make sure the reward description includes parentheses around the time format, such as `(5:00)` for 5 minutes or `(1:00:00)` for 1 hour.
+
+## 🛠️ Troubleshooting
+
+<details>
+<summary><b>Why does the status say <code>WS: Standby (127.0.0.1:8080)</code>?</b></summary>
+
+* Make sure **Streamer.bot** is open and the WebSocket Server is running under <kbd>Servers/Clients</kbd> $\rightarrow$ <kbd>WebSocket Server</kbd>.
+* If you use a port other than `8080`, click <kbd>Settings / Test</kbd> in the Dock (or <kbd>Position/WS</kbd> in the Studio), enter your custom `ws://127.0.0.1:PORT/` address, and click <kbd>Connect</kbd>.
+</details>
+
+<details>
+<summary><b>Why can't I hear the alert or timer sounds in OBS Studio?</b></summary>
+
+* Right-click your **Browser Source** in OBS Studio $\rightarrow$ <kbd>Properties</kbd> $\rightarrow$ check **Control audio via OBS**.
+* Open **Advanced Audio Properties** in OBS and set the Browser Source's **Audio Monitoring** to **Monitor and Output**.
+</details>
+
+<details>
+<summary><b>Why didn't my reward start a countdown timer?</b></summary>
+
+* Check that the reward's description ends with the duration wrapped in parentheses, such as `(5:00)` for 5 minutes or `(1:00:00)` for 1 hour.
+</details>
