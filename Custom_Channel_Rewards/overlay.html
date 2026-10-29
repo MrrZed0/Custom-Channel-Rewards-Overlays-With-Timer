@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Streamer.bot OBS Channel Reward & Timer Overlay</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&family=Orbitron:wght@700;900&family=Press+Start+2P&family=Rajdhani:wght@600;700&family=Righteous&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: transparent !important;
+      font-family: 'Inter', sans-serif;
+    }
+    .avatar-circle { border-radius: 9999px; }
+    .avatar-squircle { border-radius: 28%; }
+    .avatar-rounded { border-radius: 12px; }
+    .avatar-sharp { border-radius: 2px; }
+    .avatar-hex { clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%); }
+    .avatar-diamond { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+    .avatar-octagon { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+    .avatar-shield { clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
+    .font-orbitron { font-family: 'Orbitron', sans-serif; }
+    .font-mono-tech { font-family: 'JetBrains Mono', monospace; }
+    .font-arcade { font-family: 'Press Start 2P', monospace; }
+    .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+    .font-righteous { font-family: 'Righteous', sans-serif; }
+    .timer-stack-item { transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+  </style>
+</head>
+<body>
+  <div id="overlayRoot" class="fixed inset-0 pointer-events-none p-8 flex flex-col justify-start items-end">
+    <div id="overlayAnchor" class="w-full max-w-[450px] flex flex-col gap-3" style="transform: scale(1);">
+      <div id="alertPopupSlot" class="w-full"></div>
+      <div id="activeTimersStack" class="w-full flex flex-col gap-2.5"></div>
+    </div>
+  </div>
+
+  <script>
+    const STATE = {
+  "config": {
+    "wsUrl": "ws://127.0.0.1:8080/",
+    "twitchStartActionName": "Twitch On Reward Redeemed",
+    "twitchStartActionId": "d6a6ba11-fac2-40f6-bc92-55bf5d7e5a28",
+    "twitchEndActionName": "Twitch On Timer Finished",
+    "twitchEndActionId": "4a5ca9aa-1716-4061-9bb3-b84876344508",
+    "kickStartActionName": "Kick On Reward Redeemed",
+    "kickStartActionId": "9c4460a9-3b5f-4a8a-b365-5a59a9f6b791",
+    "kickEndActionName": "Kick On Timer Finished",
+    "kickEndActionId": "43826af9-577d-4bb9-85bc-da4761c202af",
+    "startArgName": "rewardMessage",
+    "endArgName": "timerMessage",
+    "sendChatOnTests": true,
+    "position": "top-right",
+    "moveNewestToTop": true,
+    "alertHoldSec": 10,
+    "showAlertHoldBar": true,
+    "overlayScale": 100,
+    "startChatTemplate": "{user} redeemed {reward} - {description}",
+    "endChatTemplate": "{reward} Is Over After {duration}",
+    "masterStyleId": 0,
+    "alertStyleId": 41,
+    "timerStyleId": 90,
+    "inOutFxId": 0,
+    "randomEffectOnAlert": true,
+    "randomEffectOnTimer": true,
+    "alertSoundId": 1,
+    "timerSoundId": 84,
+    "volume": 1,
+    "customAlertAudioUrl": "",
+    "customTimerAudioUrl": ""
+  },
+  "master": {
+    "id": 0,
+    "name": "#1 - Broadcast Pro Banner (Circle Halo)",
+    "dir": "row",
+    "align": "left",
+    "font": "font-sans",
+    "badgePos": "top-right",
+    "pad": "p-4",
+    "radius": "rounded-2xl",
+    "avatarClip": "avatar-circle",
+    "avatarSize": "w-14 h-14",
+    "avatarRing": "ring-2 ring-white/40"
+  },
+  "alertStyle": {
+    "id": 41,
+    "name": "#42 - Crimson Blood Moon • Minimalist Shadow Luxe",
+    "bg1": "#24070b",
+    "bg2": "#3d0a11",
+    "accent": "#f43f5e",
+    "text": "#fff1f2",
+    "sub": "#fda4af",
+    "glow": "rgba(244,63,94,0.55)",
+    "borderStyle": "1px solid",
+    "topBar": false,
+    "scanline": false,
+    "glass": false
+  },
+  "timerStyle": {
+    "id": 90,
+    "name": "#91 - Retro Arcade Ticker (Crimson Blood Moon)",
+    "archetype": "arcade-7seg",
+    "bg1": "#24070b",
+    "bg2": "#3d0a11",
+    "accent": "#f43f5e",
+    "text": "#fff1f2",
+    "sub": "#fda4af",
+    "glow": "rgba(244,63,94,0.55)"
+  },
+  "fx": {
+    "id": 0,
+    "name": "#1 - Slide Thrust • Snappy Spring (450ms)",
+    "inTx": "translateX(120%)",
+    "outTx": "translateX(120%)",
+    "dur": 450,
+    "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+    "blur": "0px"
+  },
+  "allInOutEffects": [
+    {
+      "id": 0,
+      "name": "#1 - Slide Thrust • Snappy Spring (450ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 1,
+      "name": "#2 - Slide Thrust • Ultra Fast (280ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 2,
+      "name": "#3 - Slide Thrust • Cinematic Smooth (650ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 3,
+      "name": "#4 - Slide Thrust • Heavy Bounce (750ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 4,
+      "name": "#5 - Slide Thrust • Motion Blur Warp (500ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 5,
+      "name": "#6 - Slide Thrust • Elastic Overdrive (850ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 6,
+      "name": "#7 - Slide From Left • Snappy Spring (450ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 7,
+      "name": "#8 - Slide From Left • Ultra Fast (280ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 8,
+      "name": "#9 - Slide From Left • Cinematic Smooth (650ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 9,
+      "name": "#10 - Slide From Left • Heavy Bounce (750ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 10,
+      "name": "#11 - Slide From Left • Motion Blur Warp (500ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 11,
+      "name": "#12 - Slide From Left • Elastic Overdrive (850ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 12,
+      "name": "#13 - Drop From Sky • Snappy Spring (450ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 13,
+      "name": "#14 - Drop From Sky • Ultra Fast (280ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 14,
+      "name": "#15 - Drop From Sky • Cinematic Smooth (650ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 15,
+      "name": "#16 - Drop From Sky • Heavy Bounce (750ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 16,
+      "name": "#17 - Drop From Sky • Motion Blur Warp (500ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 17,
+      "name": "#18 - Drop From Sky • Elastic Overdrive (850ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 18,
+      "name": "#19 - Rise From Floor • Snappy Spring (450ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 19,
+      "name": "#20 - Rise From Floor • Ultra Fast (280ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 20,
+      "name": "#21 - Rise From Floor • Cinematic Smooth (650ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 21,
+      "name": "#22 - Rise From Floor • Heavy Bounce (750ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 22,
+      "name": "#23 - Rise From Floor • Motion Blur Warp (500ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 23,
+      "name": "#24 - Rise From Floor • Elastic Overdrive (850ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 24,
+      "name": "#25 - Elastic Pop Zoom • Snappy Spring (450ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 25,
+      "name": "#26 - Elastic Pop Zoom • Ultra Fast (280ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 26,
+      "name": "#27 - Elastic Pop Zoom • Cinematic Smooth (650ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 27,
+      "name": "#28 - Elastic Pop Zoom • Heavy Bounce (750ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 28,
+      "name": "#29 - Elastic Pop Zoom • Motion Blur Warp (500ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 29,
+      "name": "#30 - Elastic Pop Zoom • Elastic Overdrive (850ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 30,
+      "name": "#31 - Hyper Zoom Overdrive • Snappy Spring (450ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 31,
+      "name": "#32 - Hyper Zoom Overdrive • Ultra Fast (280ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 32,
+      "name": "#33 - Hyper Zoom Overdrive • Cinematic Smooth (650ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 33,
+      "name": "#34 - Hyper Zoom Overdrive • Heavy Bounce (750ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 34,
+      "name": "#35 - Hyper Zoom Overdrive • Motion Blur Warp (500ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 35,
+      "name": "#36 - Hyper Zoom Overdrive • Elastic Overdrive (850ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 36,
+      "name": "#37 - 3D Flip Horizontal • Snappy Spring (450ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 37,
+      "name": "#38 - 3D Flip Horizontal • Ultra Fast (280ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 38,
+      "name": "#39 - 3D Flip Horizontal • Cinematic Smooth (650ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 39,
+      "name": "#40 - 3D Flip Horizontal • Heavy Bounce (750ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 40,
+      "name": "#41 - 3D Flip Horizontal • Motion Blur Warp (500ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 41,
+      "name": "#42 - 3D Flip Horizontal • Elastic Overdrive (850ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 42,
+      "name": "#43 - 3D Flip Vertical • Snappy Spring (450ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 43,
+      "name": "#44 - 3D Flip Vertical • Ultra Fast (280ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 44,
+      "name": "#45 - 3D Flip Vertical • Cinematic Smooth (650ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 45,
+      "name": "#46 - 3D Flip Vertical • Heavy Bounce (750ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 46,
+      "name": "#47 - 3D Flip Vertical • Motion Blur Warp (500ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 47,
+      "name": "#48 - 3D Flip Vertical • Elastic Overdrive (850ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 48,
+      "name": "#49 - Cyber Skew Slash • Snappy Spring (450ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 49,
+      "name": "#50 - Cyber Skew Slash • Ultra Fast (280ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 50,
+      "name": "#51 - Cyber Skew Slash • Cinematic Smooth (650ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 51,
+      "name": "#52 - Cyber Skew Slash • Heavy Bounce (750ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 52,
+      "name": "#53 - Cyber Skew Slash • Motion Blur Warp (500ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 53,
+      "name": "#54 - Cyber Skew Slash • Elastic Overdrive (850ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 54,
+      "name": "#55 - Vortex Spin-In • Snappy Spring (450ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 55,
+      "name": "#56 - Vortex Spin-In • Ultra Fast (280ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 56,
+      "name": "#57 - Vortex Spin-In • Cinematic Smooth (650ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 57,
+      "name": "#58 - Vortex Spin-In • Heavy Bounce (750ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 58,
+      "name": "#59 - Vortex Spin-In • Motion Blur Warp (500ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 59,
+      "name": "#60 - Vortex Spin-In • Elastic Overdrive (850ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 60,
+      "name": "#61 - Spiral Matrix Drop • Snappy Spring (450ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 61,
+      "name": "#62 - Spiral Matrix Drop • Ultra Fast (280ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 62,
+      "name": "#63 - Spiral Matrix Drop • Cinematic Smooth (650ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 63,
+      "name": "#64 - Spiral Matrix Drop • Heavy Bounce (750ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 64,
+      "name": "#65 - Spiral Matrix Drop • Motion Blur Warp (500ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 65,
+      "name": "#66 - Spiral Matrix Drop • Elastic Overdrive (850ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 66,
+      "name": "#67 - Origami Unfold • Snappy Spring (450ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 67,
+      "name": "#68 - Origami Unfold • Ultra Fast (280ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 68,
+      "name": "#69 - Origami Unfold • Cinematic Smooth (650ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 69,
+      "name": "#70 - Origami Unfold • Heavy Bounce (750ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 70,
+      "name": "#71 - Origami Unfold • Motion Blur Warp (500ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 71,
+      "name": "#72 - Origami Unfold • Elastic Overdrive (850ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 72,
+      "name": "#73 - Neon Whip Snap • Snappy Spring (450ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 73,
+      "name": "#74 - Neon Whip Snap • Ultra Fast (280ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 74,
+      "name": "#75 - Neon Whip Snap • Cinematic Smooth (650ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 75,
+      "name": "#76 - Neon Whip Snap • Heavy Bounce (750ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 76,
+      "name": "#77 - Neon Whip Snap • Motion Blur Warp (500ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 77,
+      "name": "#78 - Neon Whip Snap • Elastic Overdrive (850ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 78,
+      "name": "#79 - Pendulum Swing • Snappy Spring (450ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 79,
+      "name": "#80 - Pendulum Swing • Ultra Fast (280ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 80,
+      "name": "#81 - Pendulum Swing • Cinematic Smooth (650ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 81,
+      "name": "#82 - Pendulum Swing • Heavy Bounce (750ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 82,
+      "name": "#83 - Pendulum Swing • Motion Blur Warp (500ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 83,
+      "name": "#84 - Pendulum Swing • Elastic Overdrive (850ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 84,
+      "name": "#85 - Glitch Teleport • Snappy Spring (450ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 85,
+      "name": "#86 - Glitch Teleport • Ultra Fast (280ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 86,
+      "name": "#87 - Glitch Teleport • Cinematic Smooth (650ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 87,
+      "name": "#88 - Glitch Teleport • Heavy Bounce (750ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 88,
+      "name": "#89 - Glitch Teleport • Motion Blur Warp (500ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 89,
+      "name": "#90 - Glitch Teleport • Elastic Overdrive (850ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 90,
+      "name": "#91 - Diagonal Meteor • Snappy Spring (450ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 91,
+      "name": "#92 - Diagonal Meteor • Ultra Fast (280ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 92,
+      "name": "#93 - Diagonal Meteor • Cinematic Smooth (650ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 93,
+      "name": "#94 - Diagonal Meteor • Heavy Bounce (750ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 94,
+      "name": "#95 - Diagonal Meteor • Motion Blur Warp (500ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 95,
+      "name": "#96 - Diagonal Meteor • Elastic Overdrive (850ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 96,
+      "name": "#97 - Shutter Expand • Snappy Spring (450ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 97,
+      "name": "#98 - Shutter Expand • Ultra Fast (280ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 98,
+      "name": "#99 - Shutter Expand • Cinematic Smooth (650ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 99,
+      "name": "#100 - Shutter Expand • Heavy Bounce (750ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 100,
+      "name": "#101 - Shutter Expand • Motion Blur Warp (500ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 101,
+      "name": "#102 - Shutter Expand • Elastic Overdrive (850ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 102,
+      "name": "#103 - Bounce Slingshot • Snappy Spring (450ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 103,
+      "name": "#104 - Bounce Slingshot • Ultra Fast (280ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 104,
+      "name": "#105 - Bounce Slingshot • Cinematic Smooth (650ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 105,
+      "name": "#106 - Bounce Slingshot • Heavy Bounce (750ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 106,
+      "name": "#107 - Bounce Slingshot • Motion Blur Warp (500ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 107,
+      "name": "#108 - Bounce Slingshot • Elastic Overdrive (850ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    }
+  ],
+  "alertSound": {
+    "id": 1,
+    "name": "#2 - Crystal Chime (E-Minor Cyber)",
+    "baseFreq": 329.63,
+    "wave": "sawtooth",
+    "tempo": 0.07,
+    "notes": [
+      1,
+      1.2,
+      1.5,
+      1.8,
+      2
+    ],
+    "modIndex": 0
+  },
+  "timerSound": {
+    "id": 84,
+    "name": "#85 - Neon Glitch Stop (C-Major Bright)",
+    "baseFreq": 591.2724999999999,
+    "wave": "sawtooth",
+    "tempo": 0.092,
+    "notes": [
+      2,
+      1.5,
+      1.25,
+      1,
+      1.5,
+      2
+    ],
+    "modIndex": 14
+  },
+  "flexClass": "justify-start items-end"
+};
+    let activeTimers = [];
+    let timerInterval = null;
+    let alertHideTimeout = null;
+    let ws = null;
+    let audioCtx = null;
+    const actionSlots = {
+      twitchStart: { name: STATE.config.twitchStartActionName || "", id: STATE.config.twitchStartActionId || "" },
+      twitchEnd:   { name: STATE.config.twitchEndActionName || "",   id: STATE.config.twitchEndActionId || "" },
+      kickStart:   { name: STATE.config.kickStartActionName || "",   id: STATE.config.kickStartActionId || "" },
+      kickEnd:     { name: STATE.config.kickEndActionName || "",     id: STATE.config.kickEndActionId || "" }
+    };
+    const sentChatDedupe = new Set();
+
+    function escapeHtml(str) {
+      return String(str || "").replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+    }
+
+    function pickAlertFx() {
+      const pool = STATE.allInOutEffects || [STATE.fx];
+      if (STATE.config.randomEffectOnAlert && pool.length > 0) {
+        return pool[Math.floor(Math.random() * pool.length)] || STATE.fx;
+      }
+      return STATE.fx;
+    }
+
+    function pickTimerFx() {
+      const pool = STATE.allInOutEffects || [STATE.fx];
+      if (STATE.config.randomEffectOnTimer && pool.length > 0) {
+        return pool[Math.floor(Math.random() * pool.length)] || STATE.fx;
+      }
+      return STATE.fx;
+    }
+
+    function playSynthSound(preset, customUrl, isTimerEnd) {
+      if (STATE.config.volume <= 0) return;
+      if (customUrl && customUrl.length > 4) {
+        const a = new Audio(customUrl);
+        a.volume = STATE.config.volume;
+        a.play().catch(() => {});
+        return;
+      }
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const now = audioCtx.currentTime;
+        const notes = preset.notes || [1, 1.25, 1.5, 2];
+        const step = preset.tempo || 0.08;
+        notes.forEach((mult, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = preset.wave || "triangle";
+          const startTime = now + idx * step;
+          const dur = step * (isTimerEnd ? 1.8 : 1.5);
+          osc.frequency.setValueAtTime(preset.baseFreq * mult, startTime);
+          gain.gain.setValueAtTime(0.0001, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.25 * STATE.config.volume, startTime + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + dur + 0.02);
+        });
+      } catch (e) {}
+    }
+
+    function parseRewardTimerFromDescription(desc, titleFallback) {
+      const combined = ((desc || "") + " " + (titleFallback || "")).trim();
+      if (!combined) return null;
+      const endRx = /\(\s*(\d+)\s*:\s*(\d+)(?:\s*:\s*(\d+))?\s*\)\s*$/;
+      const anyRx = /\(\s*(\d+)\s*:\s*(\d+)(?:\s*:\s*(\d+))?\s*\)/;
+      const m = (desc && desc.match(endRx)) || (desc && desc.match(anyRx)) || combined.match(endRx) || combined.match(anyRx);
+      if (!m) return null;
+      let h = 0, min = 0, s = 0;
+      if (m[3] !== undefined) { h = parseInt(m[1],10)||0; min = parseInt(m[2],10)||0; s = parseInt(m[3],10)||0; }
+      else { min = parseInt(m[1],10)||0; s = parseInt(m[2],10)||0; }
+      const totalSeconds = h * 3600 + min * 60 + s;
+      if (totalSeconds <= 0) return null;
+      return { totalSeconds, formattedDuration: formatHumanDuration(totalSeconds) };
+    }
+
+    function formatHumanDuration(totalSeconds) {
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      const parts = [];
+      if (h > 0) parts.push(h + (h === 1 ? " Hour" : " Hours"));
+      if (m > 0) parts.push(m + (m === 1 ? " Min" : " Mins"));
+      if (s > 0 && h === 0) parts.push(s + (s === 1 ? " Sec" : " Secs"));
+      return parts.length > 0 ? parts.join(" ") : "0 Secs";
+    }
+
+    function formatClockReadout(sec) {
+      const s = Math.max(0, Math.floor(sec));
+      const hrs = Math.floor(s / 3600);
+      const mins = Math.floor((s % 3600) / 60);
+      const secs = s % 60;
+      if (hrs > 0) {
+        return hrs + ":" + String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+      }
+      return String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+    }
+
+    function sendChatCallback(platform, messageText, stage, redemptionId, extraVars) {
+      if (!messageText) return;
+      const stageLower = (stage || "start").toLowerCase();
+      const isEnd = stageLower === "end";
+      const isKick = (platform || "twitch").toLowerCase() === "kick";
+      const key = (redemptionId || "msg") + ":" + stageLower;
+
+      const slot = isKick
+        ? (isEnd ? actionSlots.kickEnd : actionSlots.kickStart)
+        : (isEnd ? actionSlots.twitchEnd : actionSlots.twitchStart);
+
+      if (!slot || !slot.name) return;
+      if (redemptionId && sentChatDedupe.has(key)) return;
+      if (redemptionId) sentChatDedupe.add(key);
+
+      const customArgKey = isEnd
+        ? (STATE.config.endArgName || "timerMessage").trim()
+        : (STATE.config.startArgName || "rewardMessage").trim();
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const actionObj = { name: slot.name };
+        if (slot.id) actionObj.id = slot.id;
+        const vars = extraVars || {};
+
+        ws.send(JSON.stringify({
+          request: "DoAction",
+          action: actionObj,
+          args: {
+            [customArgKey]: messageText,
+            rewardMessage: messageText,
+            timerMessage: messageText,
+            chatMessage: messageText,
+            message: messageText,
+            rawInput: messageText,
+            platform: platform || "twitch",
+            eventPhase: stageLower,
+            user: vars.user || "",
+            reward: vars.reward || "",
+            description: vars.description || "",
+            duration: vars.duration || "",
+            redemptionId: redemptionId || ("obs_" + Date.now())
+          },
+          id: "obs_chat_" + Date.now()
+        }));
+      }
+    }
+
+    async function resolveAvatar(platform, userLogin, currentAvatar) {
+      if (currentAvatar && currentAvatar.startsWith("http") && !currentAvatar.includes("unavatar.io")) return currentAvatar;
+      if (platform === "twitch" && userLogin) {
+        try {
+          const r = await fetch("https://decapi.me/twitch/avatar/" + encodeURIComponent(userLogin));
+          if (r.ok) {
+            const txt = (await r.text()).trim();
+            if (txt.startsWith("http")) return txt;
+          }
+        } catch (e) {}
+      }
+      return currentAvatar || ("https://unavatar.io/" + platform + "/" + encodeURIComponent(userLogin || "streamer"));
+    }
+
+    async function triggerRewardEvent(payload) {
+      const platform = (payload.platform || "twitch").toLowerCase();
+      const user = payload.user || "Viewer";
+      const userLogin = payload.userLogin || user;
+      const title = payload.title || "Channel Reward";
+      const description = (payload.description || "").trim();
+      const redemptionId = payload.redemptionId || ("obs_red_" + Date.now() + "_" + Math.random().toString(36).slice(2,6));
+      const avatar = await resolveAvatar(platform, userLogin, payload.avatar);
+
+      const timerInfo = payload.durationSeconds
+        ? { totalSeconds: Number(payload.durationSeconds), formattedDuration: payload.humanDuration || formatHumanDuration(Number(payload.durationSeconds)) }
+        : parseRewardTimerFromDescription(description, title);
+
+      playSynthSound(STATE.alertSound, STATE.config.customAlertAudioUrl, false);
+      const alertFx = pickAlertFx();
+      renderMainAlert({ platform, user, avatar, title, description, timerInfo, fx: alertFx });
+
+      const humanDur = timerInfo ? timerInfo.formattedDuration : "Instant";
+      if (!payload.startChatSent) {
+        let startMsg = STATE.config.startChatTemplate
+          .replace(/\{user\}/gi, user)
+          .replace(/\{reward\}/gi, title)
+          .replace(/\{description\}/gi, description)
+          .replace(/\{duration\}/gi, humanDur);
+        if (!description) startMsg = startMsg.replace(/\s*-\s*$/, "").trim();
+        sendChatCallback(platform, startMsg, "start", redemptionId, {
+          user,
+          reward: title,
+          description,
+          duration: humanDur
+        });
+      }
+
+      if (timerInfo && timerInfo.totalSeconds > 0) {
+        const timerFx = pickTimerFx();
+        const tObj = {
+          id: "t_" + Date.now() + "_" + Math.random().toString(36).slice(2,6),
+          redemptionId,
+          platform, user, avatar, title, description,
+          totalSec: timerInfo.totalSeconds,
+          remainingSec: timerInfo.totalSeconds,
+          durationLabel: timerInfo.formattedDuration,
+          fx: timerFx,
+          updatedAt: Date.now()
+        };
+        if (STATE.config.moveNewestToTop) activeTimers.unshift(tObj);
+        else activeTimers.push(tObj);
+        renderTimers(tObj.id);
+        startTimerLoop();
+      }
+    }
+
+    function renderMainAlert(data) {
+      const slot = document.getElementById("alertPopupSlot");
+      if (alertHideTimeout) clearTimeout(alertHideTimeout);
+      const master = STATE.master;
+      const style = STATE.alertStyle;
+      const fx = data.fx || STATE.fx;
+      const isKick = data.platform === "kick";
+      const platformName = isKick ? "KICK" : "TWITCH";
+      const flexDir = master.dir === "col" ? "flex-col items-center text-center" : (master.dir === "row-reverse" ? "flex-row-reverse text-right" : "flex-row text-left");
+
+      slot.innerHTML = `
+        <div id="liveAlertCard" class="relative overflow-hidden ${master.radius} ${master.pad} ${master.font}"
+             style="background: linear-gradient(135deg, ${style.bg1} 0%, ${style.bg2} 100%); border: ${style.borderStyle} ${style.accent}; box-shadow: 0 14px 35px -5px ${style.glow}; color: ${style.text}; transform: ${fx.inTx}; opacity: 0; filter: blur(${fx.blur || '0px'}); transition: all ${fx.dur}ms ${fx.ease};">
+          <div class="flex ${flexDir} gap-3.5 items-center relative z-10">
+            <img src="${escapeHtml(data.avatar)}" class="${master.avatarSize} ${master.avatarClip} object-cover" style="border: 2px solid ${style.accent};" />
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5 mb-0.5">
+                <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full" style="background:${style.accent}25; color:${style.accent}; border:1px solid ${style.accent}60;">${platformName} REWARD</span>
+                <span class="text-xs font-bold truncate" style="color: ${style.sub};">${escapeHtml(data.user)}</span>
+              </div>
+              <h3 class="text-lg font-black leading-snug" style="color: ${style.text};">${escapeHtml(data.title)}</h3>
+              ${data.description ? `<p class="text-xs mt-1 opacity-95" style="color: ${style.sub};">${escapeHtml(data.description)}</p>` : ''}
+            </div>
+          </div>
+          ${STATE.config.showAlertHoldBar !== false ? `
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-black/40 overflow-hidden">
+              <div id="liveAlertHoldBar" class="h-full w-full" style="background: ${style.accent}; transform-origin: left center; transform: scaleX(1);"></div>
+            </div>
+          ` : ''}
+        </div>`;
+
+      const holdMs = Math.max(0.5, Number(STATE.config.alertHoldSec) || 6) * 1000;
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const c = document.getElementById("liveAlertCard");
+        if (c) { c.style.transform = "translate(0,0) scale(1)"; c.style.opacity = "1"; c.style.filter = "blur(0px)"; }
+        const hb = document.getElementById("liveAlertHoldBar");
+        if (hb) { hb.style.transition = "transform " + holdMs + "ms linear"; hb.style.transform = "scaleX(0)"; }
+      }));
+
+      alertHideTimeout = setTimeout(() => {
+        const c = document.getElementById("liveAlertCard");
+        if (c) {
+          c.style.transform = fx.outTx;
+          c.style.opacity = "0";
+          c.style.filter = "blur(" + (fx.blur || "0px") + ")";
+          setTimeout(() => { slot.innerHTML = ""; }, fx.dur + 50);
+        }
+      }, holdMs);
+    }
+
+    function startTimerLoop() {
+      if (timerInterval) return;
+      timerInterval = setInterval(() => {
+        if (activeTimers.length === 0) { clearInterval(timerInterval); timerInterval = null; return; }
+        const done = [];
+        activeTimers.forEach(t => {
+          if (t.completing) return;
+          t.remainingSec = Math.max(0, t.remainingSec - 1);
+          const cEl = document.getElementById("timer-clock-" + t.id);
+          if (cEl) cEl.textContent = formatClockReadout(t.remainingSec);
+          const bEl = document.getElementById("timer-bar-" + t.id);
+          if (bEl) bEl.style.width = ((t.remainingSec / t.totalSec) * 100) + "%";
+          if (t.remainingSec <= 0) {
+            t.completing = true;
+            done.push(t);
+          }
+        });
+        done.forEach(d => {
+          playSynthSound(STATE.timerSound, STATE.config.customTimerAudioUrl, true);
+          const endMsg = STATE.config.endChatTemplate
+            .replace(/\{user\}/gi, d.user)
+            .replace(/\{reward\}/gi, d.title)
+            .replace(/\{description\}/gi, d.description)
+            .replace(/\{duration\}/gi, d.durationLabel);
+          sendChatCallback(d.platform, endMsg, "end", d.redemptionId, {
+            user: d.user,
+            reward: d.title,
+            description: d.description,
+            duration: d.durationLabel
+          });
+
+          const el = document.getElementById("timer-card-" + d.id);
+          const fx = d.fx || STATE.fx;
+          if (el) {
+            el.style.transition = "all " + fx.dur + "ms " + fx.ease;
+            el.style.transform = fx.outTx;
+            el.style.opacity = "0";
+          }
+          setTimeout(() => {
+            activeTimers = activeTimers.filter(x => x.id !== d.id);
+            renderTimers();
+          }, (fx.dur || 400) + 40);
+        });
+      }, 1000);
+    }
+
+    function renderTimers(newlyAddedId) {
+      const container = document.getElementById("activeTimersStack");
+      const master = STATE.master;
+      const tStyle = STATE.timerStyle;
+      container.innerHTML = activeTimers.map(t => {
+        const pct = Math.max(0, Math.min(100, (t.remainingSec / t.totalSec) * 100));
+        const fx = t.fx || STATE.fx;
+        const initStyle = (t.id === newlyAddedId)
+          ? `transform: ${fx.inTx}; opacity: 0; transition: all ${fx.dur}ms ${fx.ease};`
+          : `transform: translate(0,0) scale(1); opacity: 1;`;
+        return `
+          <div id="timer-card-${t.id}" class="timer-stack-item relative overflow-hidden ${master.radius} p-3.5 ${master.font}"
+               style="background: linear-gradient(135deg, ${tStyle.bg1}f5, ${tStyle.bg2}f5); border: 1.5px solid ${tStyle.accent}; box-shadow: 0 8px 25px ${tStyle.glow}; color: ${tStyle.text}; ${initStyle}">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <img src="${escapeHtml(t.avatar)}" class="w-10 h-10 ${master.avatarClip} object-cover shrink-0" style="border: 1.5px solid ${tStyle.accent};" />
+                <div class="min-w-0">
+                  <div class="text-[11px] font-bold truncate" style="color:${tStyle.sub};">${escapeHtml(t.user)}</div>
+                  <div class="text-sm font-extrabold truncate" style="color:${tStyle.text};">${escapeHtml(t.title)}</div>
+                </div>
+              </div>
+              <div id="timer-clock-${t.id}" class="font-mono-tech text-lg font-black px-2.5 py-1 rounded-lg bg-black/45" style="color:${tStyle.accent};">
+                ${formatClockReadout(t.remainingSec)}
+              </div>
+            </div>
+            <div class="w-full h-2 bg-black/50 rounded-full overflow-hidden mt-2.5">
+              <div id="timer-bar-${t.id}" class="h-full rounded-full transition-all duration-500" style="width: ${pct}%; background: ${tStyle.accent};"></div>
+            </div>
+          </div>`;
+      }).join("");
+
+      if (newlyAddedId) {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const el = document.getElementById("timer-card-" + newlyAddedId);
+          if (el) { el.style.transform = "translate(0,0) scale(1)"; el.style.opacity = "1"; }
+        }));
+      }
+    }
+
+    function connectOBSWebSocket() {
+      ws = new WebSocket(STATE.config.wsUrl || "ws://127.0.0.1:8080/");
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          request: "Subscribe",
+          id: "obs_reward_overlay",
+          events: { Twitch: ["RewardRedemption"], Kick: ["RewardRedemption"], General: ["Custom"] }
+        }));
+        ws.send(JSON.stringify({ request: "GetActions", id: "fetch-actions" }));
+      };
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.id === "fetch-actions" || Array.isArray(msg.actions)) {
+            const list = Array.isArray(msg.actions) ? msg.actions : [];
+            Object.keys(actionSlots).forEach(k => {
+              const targetName = (actionSlots[k].name || "").toLowerCase();
+              if (!targetName) return;
+              const match = list.find(a => (a.name || "").toLowerCase() === targetName);
+              if (match) {
+                actionSlots[k].id = match.id;
+                actionSlots[k].name = match.name;
+              }
+            });
+            return;
+          }
+          if (!msg.event || !msg.data) return;
+          const d = msg.data;
+          const customPayload = (d.overlayType === "channelRewardAlert" || d.eventName === "RewardStudio.Redemption")
+            ? d
+            : ((d.data && (d.data.overlayType === "channelRewardAlert" || d.data.eventName === "RewardStudio.Redemption")) ? d.data : null);
+
+          if (customPayload) {
+            triggerRewardEvent(customPayload);
+            return;
+          }
+          if ((msg.event.type || "").toLowerCase() === "rewardredemption") {
+            const red = d.redemption || d;
+            const reward = red.reward || d.reward || {};
+            const uObj = red.user || d.user || {};
+            const platform = (msg.event.source || "").toLowerCase().includes("kick") ? "kick" : "twitch";
+            const user = red.user_name || d.user_name || uObj.display_name || uObj.name || uObj.username || "Viewer";
+            const userLogin = red.user_login || d.user_login || uObj.login || user;
+            const rawPrompt = reward.prompt || reward.description || d.prompt || d.rewardPrompt || "";
+            const userInput = red.user_input || d.user_input || d.rawInput || d.message || "";
+            const fullDesc = [rawPrompt, (userInput && userInput !== rawPrompt) ? userInput : ""].filter(Boolean).join(" - ");
+            triggerRewardEvent({
+              redemptionId: red.id || d.id || ("nat_" + Date.now()),
+              platform,
+              user,
+              userLogin,
+              avatar: d.user_avatar || uObj.profile_image_url || "",
+              title: reward.title || d.reward_title || "Channel Reward",
+              description: fullDesc,
+              startChatSent: false
+            });
+          }
+        } catch (err) {}
+      };
+      ws.onclose = () => setTimeout(connectOBSWebSocket, 4000);
+    }
+
+    window.addEventListener("load", () => {
+      connectOBSWebSocket();
+    });
+  </script>
+</body>
+</html>

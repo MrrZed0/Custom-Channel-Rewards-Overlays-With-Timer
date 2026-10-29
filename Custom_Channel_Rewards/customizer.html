@@ -1,0 +1,3481 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Streamer.bot Twitch & Kick Channel Reward Studio & OBS Overlay Customizer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&family=Orbitron:wght@600;800;900&family=Press+Start+2P&family=Rajdhani:wght@600;700&family=Righteous&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <style>
+    :root {
+      --studio-bg: #090b10;
+      --studio-panel: #11151f;
+      --studio-border: #1e2638;
+      --accent-twitch: #9146FF;
+      --accent-kick: #53FC18;
+    }
+
+    * {
+      box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: #2c3650 #0d1017;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--studio-bg);
+      color: #f1f5f9;
+      overflow-x: hidden;
+    }
+
+    /* Checkerboard pattern for OBS transparency preview */
+    .obs-checkerboard {
+      background-color: #12151e;
+      background-image: 
+        linear-gradient(45deg, #191d29 25%, transparent 25%), 
+        linear-gradient(-45deg, #191d29 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, #191d29 75%), 
+        linear-gradient(-45deg, transparent 75%, #191d29 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+    }
+
+    .obs-game-backdrop {
+      background:
+        radial-gradient(circle at 20% 25%, rgba(145, 70, 255, 0.22), transparent 45%),
+        radial-gradient(circle at 80% 75%, rgba(83, 252, 24, 0.16), transparent 45%),
+        linear-gradient(135deg, #0b0f19 0%, #131b2e 50%, #090d16 100%);
+    }
+
+    /* Dynamic Keyframes for 108+ In/Out Effects Engine */
+    @keyframes sbPulseGlow {
+      0%, 100% { filter: drop-shadow(0 0 8px var(--fx-glow, rgba(145,70,255,0.6))); }
+      50% { filter: drop-shadow(0 0 20px var(--fx-glow, rgba(83,252,24,0.9))); }
+    }
+
+    @keyframes sbScanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(200%); }
+    }
+
+    @keyframes sbShimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    @keyframes sbFloat {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-4px); }
+    }
+
+    .animate-float {
+      animation: sbFloat 3s ease-in-out infinite;
+    }
+
+    /* Avatar Clip Paths */
+    .avatar-circle { border-radius: 9999px; }
+    .avatar-squircle { border-radius: 28%; }
+    .avatar-rounded { border-radius: 12px; }
+    .avatar-sharp { border-radius: 2px; }
+    .avatar-hex {
+      clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);
+    }
+    .avatar-diamond {
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    }
+    .avatar-octagon {
+      clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+    }
+    .avatar-shield {
+      clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);
+    }
+
+    /* Digital & Custom Fonts */
+    .font-orbitron { font-family: 'Orbitron', sans-serif; }
+    .font-mono-tech { font-family: 'JetBrains Mono', monospace; }
+    .font-arcade { font-family: 'Press Start 2P', monospace; }
+    .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+    .font-righteous { font-family: 'Righteous', sans-serif; }
+
+    /* Smooth item reorder transition */
+    .timer-stack-item {
+      transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col select-none overflow-hidden">
+
+  <!-- TOP BROADCAST STUDIO HEADER -->
+  <header class="h-16 bg-[#0d111a] border-b border-slate-800/90 px-4 flex items-center justify-between shrink-0 z-30">
+    <!-- Left Brand & WS Status -->
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 via-indigo-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-purple-600/20 border border-white/15">
+        <i class="fa-solid fa-bolt-lightning text-white text-lg"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-extrabold text-sm md:text-base tracking-tight text-white">STREAMER.BOT REWARD STUDIO</h1>
+          <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">Twitch + Kick</span>
+        </div>
+        <p class="text-[11px] text-slate-400 hidden sm:block">Channel Reward Alert & Auto-Timer Stack OBS Customizer</p>
+      </div>
+
+      <!-- Live WebSocket Status Pill -->
+      <div id="wsStatusPill" class="ml-2 md:ml-4 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs">
+        <span id="wsDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="wsStatusText" class="font-medium text-slate-300">WS: Standby (127.0.0.1:8080)</span>
+        <button onclick="connectWebSocket(true)" class="text-[11px] text-indigo-400 hover:text-indigo-300 underline ml-1" title="Connect now">Connect</button>
+      </div>
+    </div>
+
+    <!-- Center Quick Live Test Triggers -->
+    <div class="hidden xl:flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800">
+      <button onclick="triggerPresetTest('twitch_timer')" class="px-3 py-1.5 rounded-lg bg-[#9146FF]/20 hover:bg-[#9146FF]/35 border border-[#9146FF]/50 text-purple-200 text-xs font-semibold flex items-center gap-1.5 transition">
+        <i class="fa-brands fa-twitch text-[#9146FF]"></i>
+        <span>Test Twitch + Timer (0:15)</span>
+      </button>
+      <button onclick="triggerPresetTest('kick_timer')" class="px-3 py-1.5 rounded-lg bg-[#53FC18]/15 hover:bg-[#53FC18]/30 border border-[#53FC18]/50 text-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-k text-[#53FC18]"></i>
+        <span>Test Kick + Timer (5:00)</span>
+      </button>
+      <button onclick="triggerPresetTest('hour_timer')" class="px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-200 text-xs font-semibold flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-clock text-cyan-400"></i>
+        <span>Test (1:00:00) Stack</span>
+      </button>
+      <button onclick="triggerPresetTest('instant')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+        <span>Instant Alert</span>
+      </button>
+      <div class="h-5 w-[1px] bg-slate-800 mx-0.5"></div>
+      <label class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 cursor-pointer" title="Randomize In/Out animation on every alert & timer">
+        <input type="checkbox" id="topRandomFxToggle" checked onchange="toggleQuickRandomFx(this.checked)" class="w-3.5 h-3.5 accent-cyan-400 rounded" />
+        <span class="text-[11px] font-bold text-cyan-300">🎲 Random In/Out FX</span>
+      </label>
+    </div>
+
+    <!-- Right Action Buttons: C# Script & Export OBS HTML -->
+    <div class="flex items-center gap-2.5">
+      <button onclick="randomizeAllStyles()" class="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition" title="Randomize from 100+ styles & sounds">
+        <i class="fa-solid fa-dice text-pink-400"></i>
+        <span class="hidden md:inline">Randomize</span>
+      </button>
+
+      <button onclick="openCSharpModal()" class="px-3.5 py-2 rounded-xl bg-indigo-600/25 hover:bg-indigo-600/40 border border-indigo-500/50 text-indigo-200 text-xs font-bold flex items-center gap-2 transition shadow-sm">
+        <i class="fa-solid fa-code text-indigo-400"></i>
+        <span>C# Streamer.bot Script</span>
+      </button>
+
+      <button onclick="exportOBSOverlayHTML()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30 border border-white/20 transition">
+        <i class="fa-solid fa-file-export"></i>
+        <span>Export OBS Overlay HTML</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE: LEFT SIDEBAR + CENTER PREVIEW STAGE -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- LEFT CONFIGURATION SIDEBAR -->
+    <aside class="w-full md:w-[430px] lg:w-[460px] bg-[#0e121b] border-r border-slate-800/90 flex flex-col shrink-0 z-20">
+      
+      <!-- Sidebar Navigation Tabs -->
+      <div class="grid grid-cols-5 gap-1 p-2 bg-[#090c12] border-b border-slate-800 text-[11px] font-bold">
+        <button onclick="switchTab('tab-layout')" id="btn-tab-layout" class="tab-btn py-2 px-1 rounded-lg bg-indigo-600 text-white flex flex-col items-center gap-1 transition">
+          <i class="fa-solid fa-up-down-left-right text-xs"></i>
+          <span>Position/WS</span>
+        </button>
+        <button onclick="switchTab('tab-styles')" id="btn-tab-styles" class="tab-btn py-2 px-1 rounded-lg text-slate-400 hover:bg-slate-800/60 flex flex-col items-center gap-1 transition">
+          <i class="fa-solid fa-palette text-xs"></i>
+          <span>100+ Styles</span>
+        </button>
+        <button onclick="switchTab('tab-timers')" id="btn-tab-timers" class="tab-btn py-2 px-1 rounded-lg text-slate-400 hover:bg-slate-800/60 flex flex-col items-center gap-1 transition">
+          <i class="fa-solid fa-stopwatch text-xs"></i>
+          <span>100+ Timers</span>
+        </button>
+        <button onclick="switchTab('tab-sounds')" id="btn-tab-sounds" class="tab-btn py-2 px-1 rounded-lg text-slate-400 hover:bg-slate-800/60 flex flex-col items-center gap-1 transition">
+          <i class="fa-solid fa-volume-high text-xs"></i>
+          <span>100+ Sounds</span>
+        </button>
+        <button onclick="switchTab('tab-simulator')" id="btn-tab-simulator" class="tab-btn py-2 px-1 rounded-lg text-slate-400 hover:bg-slate-800/60 flex flex-col items-center gap-1 transition">
+          <i class="fa-solid fa-flask text-xs"></i>
+          <span>Test Lab</span>
+        </button>
+      </div>
+
+      <!-- TAB CONTENT SCROLL CONTAINER -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-5">
+
+        <!-- TAB 1: POSITION, WEBSOCKET & CHAT TEMPLATES -->
+        <div id="tab-layout" class="tab-pane space-y-5">
+          
+          <!-- 9-Position Screen Placement Matrix -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <i class="fa-solid fa-border-all text-indigo-400"></i>
+                Screen Pop-up Position (9 Zones)
+              </label>
+              <span id="posLabelBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Bottom-Right</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 p-2 bg-[#090c14] rounded-xl border border-slate-800/80">
+              <button onclick="setScreenPosition('top-left')" data-pos="top-left" class="pos-btn h-12 rounded-lg border border-slate-800 bg-slate-900 hover:border-indigo-500/60 flex items-start justify-start p-2 transition">
+                <span class="w-3 h-3 rounded-sm bg-slate-600"></span>
+                <span class="text-[10px] ml-1.5 text-slate-400">Top Left</span>
+              </button>
+              <button onclick="setScreenPosition('top-center')" data-pos="top-center" class="pos-btn h-12 rounded-lg border border-slate-800 bg-slate-900 hover:border-indigo-500/60 flex items-start justify-center p-2 transition">
+                <span class="w-3 h-3 rounded-sm bg-slate-600"></span>
+                <span class="text-[10px] ml-1.5 text-slate-400">Top Center</span>
+              </button>
+              <button onclick="setScreenPosition('top-right')" data-pos="top-right" class="pos-btn h-12 rounded-lg border border-slate-800 bg-slate-900 hover:border-indigo-500/60 flex items-start justify-end p-2 transition">
+                <span class="text-[10px] mr-1.5 text-slate-400">Top Right</span>
+                <span class="w-3 h-3 rounded-sm bg-slate-600"></span>
+              </button>
+
+              <button onclick="setScreenPosition('middle-left')" data-pos="middle-left" class="pos-btn h-12 rounded-lg border border-slate-800 bg-slate-900 hover:border-indigo-500/60 flex items-center justify-start p-2 transition">
+                <span class="w-3 h-3 rounded-sm bg-slate-600"></span>
+                <span class="text-[10px] ml-1.5 text-slate-400">Mid Left</span>
+              </button>
+              <button onclick="setScreenPosition('center')" data-pos="center" class="pos-btn h-12 rounded-lg border border-slate-800 bg-slate-900 hover:border-indigo-500/60 flex items-center justify-center p-2 transition">
+                <span class="w-3 h-3 rounded-sm bg-slate-600"></span>
+                <span class="text-[10px] ml-1.5 text-slate-400">Center</span>
+              </button>
+              <button onclick="setScreenPosition('middle-right')" data-pos="middle-right" class="pos-btn h-12 rounded-lg border border-slate-800 bg-slate-900 hover:border-indigo-500/60 flex items-center justify-end p-2 transition">
+                <span class="text-[10px] mr-1.5 text-slate-400">Mid Right</span>
+                <span class="w-3 h-3 rounded-sm bg-slate-600"></span>
+              </button>
+
+              <button onclick="setScreenPosition('bottom-left')" data-pos="bottom-left" class="pos-btn h-12 rounded-lg border border-slate-800 bg-slate-900 hover:border-indigo-500/60 flex items-end justify-start p-2 transition">
+                <span class="w-3 h-3 rounded-sm bg-slate-600"></span>
+                <span class="text-[10px] ml-1.5 text-slate-400">Bot Left</span>
+              </button>
+              <button onclick="setScreenPosition('bottom-center')" data-pos="bottom-center" class="pos-btn h-12 rounded-lg border border-slate-800 bg-slate-900 hover:border-indigo-500/60 flex items-end justify-center p-2 transition">
+                <span class="w-3 h-3 rounded-sm bg-slate-600"></span>
+                <span class="text-[10px] ml-1.5 text-slate-400">Bot Center</span>
+              </button>
+              <button onclick="setScreenPosition('bottom-right')" data-pos="bottom-right" class="pos-btn h-12 rounded-lg border border-indigo-500 bg-indigo-600/20 flex items-end justify-end p-2 transition">
+                <span class="text-[10px] mr-1.5 text-indigo-200 font-bold">Bot Right</span>
+                <span class="w-3 h-3 rounded-sm bg-indigo-400"></span>
+              </button>
+            </div>
+
+            <!-- Timer Stacking Behavior -->
+            <div class="pt-2 space-y-3 border-t border-slate-800/80">
+              <label class="flex items-center justify-between cursor-pointer">
+                <div>
+                  <span class="text-xs font-semibold text-slate-200 block">Move New Active Timed Reward to Top</span>
+                  <span class="text-[11px] text-slate-400">When another reward with a timer triggers, pin it to top of list</span>
+                </div>
+                <input type="checkbox" id="cfgMoveNewestToTop" checked onchange="updateConfigFromUI()" class="w-4 h-4 accent-indigo-500 rounded" />
+              </label>
+
+              <!-- Custom Alert Display Time (How Many Seconds Before Alert Goes Away) -->
+              <div class="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <label class="text-xs font-bold text-indigo-200 flex items-center gap-1.5">
+                      <i class="fa-solid fa-hourglass-start text-indigo-400"></i>
+                      Alert Display Time (Before It Goes Away)
+                    </label>
+                    <span class="text-[10px] text-slate-400 block">Set how many seconds the reward alert stays on screen</span>
+                  </div>
+                  <span id="alertHoldBadge" class="text-xs font-mono font-bold px-2 py-0.5 rounded-lg bg-indigo-500/25 text-indigo-200 border border-indigo-500/40">6s</span>
+                </div>
+
+                <!-- Slider + Custom Seconds Input -->
+                <div class="flex items-center gap-3">
+                  <input type="range" id="cfgAlertHoldSlider" min="1" max="60" step="1" value="6" oninput="setAlertHoldSeconds(this.value, false)" class="flex-1 accent-indigo-500 cursor-pointer" />
+                  <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1">
+                    <input type="number" id="cfgAlertHoldSec" value="6" min="1" max="600" step="0.5" oninput="setAlertHoldSeconds(this.value, false)" class="w-14 bg-transparent text-xs font-mono font-bold text-white text-center focus:outline-none" title="Enter any custom number of seconds" />
+                    <span class="text-[10px] text-slate-400 font-mono">sec</span>
+                  </div>
+                </div>
+
+                <!-- Quick Second Presets -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="text-[10px] text-slate-400 mr-1">Quick Set:</span>
+                  <button type="button" onclick="setAlertHoldSeconds(3, true)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600/40 border border-slate-700 text-[10px] font-mono text-slate-200 transition">3s</button>
+                  <button type="button" onclick="setAlertHoldSeconds(5, true)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600/40 border border-slate-700 text-[10px] font-mono text-slate-200 transition">5s</button>
+                  <button type="button" onclick="setAlertHoldSeconds(6, true)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600/40 border border-slate-700 text-[10px] font-mono text-slate-200 transition">6s</button>
+                  <button type="button" onclick="setAlertHoldSeconds(8, true)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600/40 border border-slate-700 text-[10px] font-mono text-slate-200 transition">8s</button>
+                  <button type="button" onclick="setAlertHoldSeconds(10, true)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600/40 border border-slate-700 text-[10px] font-mono text-slate-200 transition">10s</button>
+                  <button type="button" onclick="setAlertHoldSeconds(15, true)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600/40 border border-slate-700 text-[10px] font-mono text-slate-200 transition">15s</button>
+                  <button type="button" onclick="setAlertHoldSeconds(30, true)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600/40 border border-slate-700 text-[10px] font-mono text-slate-200 transition">30s</button>
+                </div>
+
+                <!-- Optional Visual Disappear Progress Bar on Alert Card -->
+                <label class="flex items-center justify-between cursor-pointer pt-1.5 border-t border-indigo-500/20">
+                  <span class="text-[11px] text-slate-300">Show Disappear Countdown Bar on Alert Card</span>
+                  <input type="checkbox" id="cfgShowAlertHoldBar" checked onchange="updateConfigFromUI()" class="w-3.5 h-3.5 accent-indigo-500 rounded" />
+                </label>
+              </div>
+
+              <div class="pt-1">
+                <label class="text-[11px] text-slate-400 block mb-1">Overlay Scale (%)</label>
+                <input type="number" id="cfgOverlayScale" value="100" min="50" max="150" step="5" onchange="updateConfigFromUI()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Streamer.bot WebSocket & Chat Bridge Settings -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <i class="fa-solid fa-plug text-emerald-400"></i>
+                Streamer.bot WebSocket & Chat Bridge
+              </label>
+              <span id="resolvedActionBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Action: Auto-Detect</span>
+            </div>
+
+            <div class="flex gap-2">
+              <input type="text" id="cfgWsUrl" value="ws://127.0.0.1:8080/" onchange="updateConfigFromUI()" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-emerald-300" placeholder="ws://127.0.0.1:8080/" />
+              <button onclick="connectWebSocket(true)" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition">
+                Connect
+              </button>
+            </div>
+
+            <!-- Action Name + Auto-Discovered Streamer.bot Actions Dropdown -->
+            <div class="space-y-2.5 pt-2 border-t border-slate-800/80">
+              <div class="flex items-center justify-between">
+                <label class="text-[11px] text-slate-200 font-bold">Select Streamer.bot Actions for Chat (No C# Needed)</label>
+                <button onclick="requestStreamerBotActions(true)" class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/30 flex items-center gap-1 transition">
+                  <i class="fa-solid fa-rotate"></i> Refresh Actions List
+                </button>
+              </div>
+              <p class="text-[10px] text-slate-400 leading-relaxed">
+                Connect to Streamer.bot to populate the dropdown boxes below, or type your Action names directly. The overlay will trigger each Action via <code class="text-emerald-300">DoAction</code> and pass the formatted message as an <code class="text-indigo-300">arg</code>.
+              </p>
+
+              <!-- TWITCH ACTION DROPDOWNS -->
+              <div class="p-2.5 rounded-xl bg-[#9146FF]/10 border border-[#9146FF]/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-extrabold text-purple-200 flex items-center gap-1.5">
+                    <i class="fa-brands fa-twitch text-[#9146FF]"></i> Twitch Chat Actions
+                  </span>
+                  <span class="text-[9px] font-mono text-purple-300/80">Platform: Twitch</span>
+                </div>
+
+                <!-- 1. Twitch Redeemed Action -->
+                <div class="space-y-1">
+                  <label class="text-[10px] text-slate-300 font-semibold block">1. Twitch • On Reward Redeemed Action:</label>
+                  <select id="selectTwitchStartAction" onchange="onSelectActionDropdown('twitchStart', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-purple-200 font-mono">
+                    <option value="">-- Select Streamer.bot Action (or type below) --</option>
+                  </select>
+                  <input type="text" id="cfgTwitchStartActionName" value="Twitch_Reward_Redeemed_Chat" oninput="onManualActionNameInput('twitchStart', this.value)" class="w-full bg-slate-950/80 border border-slate-800/90 rounded-lg px-2.5 py-1 text-[11px] font-mono text-slate-200" placeholder="Type or select Twitch Redeemed Action name..." />
+                </div>
+
+                <!-- 2. Twitch Timer Finished Action -->
+                <div class="space-y-1 pt-1 border-t border-[#9146FF]/20">
+                  <label class="text-[10px] text-slate-300 font-semibold block">2. Twitch • On Timer Finished Action:</label>
+                  <select id="selectTwitchEndAction" onchange="onSelectActionDropdown('twitchEnd', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-purple-200 font-mono">
+                    <option value="">-- Select Streamer.bot Action (or type below) --</option>
+                  </select>
+                  <input type="text" id="cfgTwitchEndActionName" value="Twitch_Timer_Finished_Chat" oninput="onManualActionNameInput('twitchEnd', this.value)" class="w-full bg-slate-950/80 border border-slate-800/90 rounded-lg px-2.5 py-1 text-[11px] font-mono text-slate-200" placeholder="Type or select Twitch Timer Finish Action name..." />
+                </div>
+
+                <div class="grid grid-cols-2 gap-1.5 pt-1">
+                  <button onclick="sendLiveTestChatMessage('twitch', 'start')" class="py-1.5 px-2 rounded-lg bg-[#9146FF]/25 hover:bg-[#9146FF]/40 border border-[#9146FF]/50 text-purple-200 text-[10px] font-bold flex items-center justify-center gap-1 transition">
+                    <i class="fa-solid fa-play text-[9px]"></i> Test Twitch Redeemed
+                  </button>
+                  <button onclick="sendLiveTestChatMessage('twitch', 'end')" class="py-1.5 px-2 rounded-lg bg-[#9146FF]/25 hover:bg-[#9146FF]/40 border border-[#9146FF]/50 text-purple-200 text-[10px] font-bold flex items-center justify-center gap-1 transition">
+                    <i class="fa-solid fa-flag-checkered text-[9px]"></i> Test Twitch Timer End
+                  </button>
+                </div>
+              </div>
+
+              <!-- KICK ACTION DROPDOWNS -->
+              <div class="p-2.5 rounded-xl bg-[#53FC18]/10 border border-[#53FC18]/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-extrabold text-emerald-200 flex items-center gap-1.5">
+                    <i class="fa-solid fa-k text-[#53FC18]"></i> Kick Chat Actions
+                  </span>
+                  <span class="text-[9px] font-mono text-emerald-300/80">Platform: Kick</span>
+                </div>
+
+                <!-- 1. Kick Redeemed Action -->
+                <div class="space-y-1">
+                  <label class="text-[10px] text-slate-300 font-semibold block">1. Kick • On Reward Redeemed Action:</label>
+                  <select id="selectKickStartAction" onchange="onSelectActionDropdown('kickStart', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-emerald-200 font-mono">
+                    <option value="">-- Select Streamer.bot Action (or type below) --</option>
+                  </select>
+                  <input type="text" id="cfgKickStartActionName" value="Kick_Reward_Redeemed_Chat" oninput="onManualActionNameInput('kickStart', this.value)" class="w-full bg-slate-950/80 border border-slate-800/90 rounded-lg px-2.5 py-1 text-[11px] font-mono text-slate-200" placeholder="Type or select Kick Redeemed Action name..." />
+                </div>
+
+                <!-- 2. Kick Timer Finished Action -->
+                <div class="space-y-1 pt-1 border-t border-[#53FC18]/20">
+                  <label class="text-[10px] text-slate-300 font-semibold block">2. Kick • On Timer Finished Action:</label>
+                  <select id="selectKickEndAction" onchange="onSelectActionDropdown('kickEnd', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-emerald-200 font-mono">
+                    <option value="">-- Select Streamer.bot Action (or type below) --</option>
+                  </select>
+                  <input type="text" id="cfgKickEndActionName" value="Kick_Timer_Finished_Chat" oninput="onManualActionNameInput('kickEnd', this.value)" class="w-full bg-slate-950/80 border border-slate-800/90 rounded-lg px-2.5 py-1 text-[11px] font-mono text-slate-200" placeholder="Type or select Kick Timer Finish Action name..." />
+                </div>
+
+                <div class="grid grid-cols-2 gap-1.5 pt-1">
+                  <button onclick="sendLiveTestChatMessage('kick', 'start')" class="py-1.5 px-2 rounded-lg bg-[#53FC18]/15 hover:bg-[#53FC18]/30 border border-[#53FC18]/40 text-emerald-200 text-[10px] font-bold flex items-center justify-center gap-1 transition">
+                    <i class="fa-solid fa-play text-[9px]"></i> Test Kick Redeemed
+                  </button>
+                  <button onclick="sendLiveTestChatMessage('kick', 'end')" class="py-1.5 px-2 rounded-lg bg-[#53FC18]/15 hover:bg-[#53FC18]/30 border border-[#53FC18]/40 text-emerald-200 text-[10px] font-bold flex items-center justify-center gap-1 transition">
+                    <i class="fa-solid fa-flag-checkered text-[9px]"></i> Test Kick Timer End
+                  </button>
+                </div>
+              </div>
+
+              <label class="flex items-center justify-between cursor-pointer pt-1">
+                <div>
+                  <span class="text-xs font-semibold text-slate-200 block">Trigger Actions on Studio Test Buttons</span>
+                  <span class="text-[10px] text-slate-400">When connected, clicking Test buttons also triggers your selected Streamer.bot Actions</span>
+                </div>
+                <input type="checkbox" id="cfgSendChatOnTests" checked onchange="updateConfigFromUI()" class="w-4 h-4 accent-emerald-500 rounded" />
+              </label>
+            </div>
+          </div>
+
+          <!-- Platform Chat Message Announcement Templates & Action Args -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3.5">
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <i class="fa-solid fa-comments text-purple-400"></i>
+              Message Templates & Streamer.bot Action Args
+            </label>
+
+            <!-- 1. On Reward Redeemed Message & Arg -->
+            <div class="p-3 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="text-[11px] text-purple-300 font-bold">1. On Reward Redeemed Message:</label>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-500/30">
+                  Arg: <code id="startArgPreviewBadge">%rewardMessage%</code>
+                </span>
+              </div>
+              <input type="text" id="cfgStartChatTemplate" value="{user} redeemed {reward} - {description}" onchange="updateConfigFromUI()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-purple-200" />
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-slate-400 shrink-0">Action Arg Name:</span>
+                <input type="text" id="cfgStartArgName" value="rewardMessage" oninput="updateConfigFromUI()" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] font-mono text-indigo-300" placeholder="rewardMessage" />
+              </div>
+              <span class="text-[10px] text-slate-400 block">
+                In Streamer.bot Sub-Action (Send Message to Channel), use <code class="text-emerald-300 font-mono">%rewardMessage%</code> or <code class="text-emerald-300 font-mono">%chatMessage%</code>.
+              </span>
+            </div>
+
+            <!-- 2. On Timer Finished Message & Arg -->
+            <div class="p-3 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="text-[11px] text-emerald-300 font-bold">2. On Timer Finished Message:</label>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-200 border border-emerald-500/30">
+                  Arg: <code id="endArgPreviewBadge">%timerMessage%</code>
+                </span>
+              </div>
+              <input type="text" id="cfgEndChatTemplate" value="{reward} Is Over After {duration}" onchange="updateConfigFromUI()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-emerald-200" />
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-slate-400 shrink-0">Action Arg Name:</span>
+                <input type="text" id="cfgEndArgName" value="timerMessage" oninput="updateConfigFromUI()" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] font-mono text-emerald-300" placeholder="timerMessage" />
+              </div>
+              <span class="text-[10px] text-slate-400 block">
+                In Streamer.bot Sub-Action (Send Message to Channel), use <code class="text-emerald-300 font-mono">%timerMessage%</code> or <code class="text-emerald-300 font-mono">%chatMessage%</code>.
+              </span>
+            </div>
+
+            <div class="text-[10px] text-slate-400 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+              <strong class="text-slate-200">Extra Args Also Sent Automatically:</strong>
+              <code class="text-indigo-300">%chatMessage%</code>, <code class="text-indigo-300">%message%</code>, <code class="text-indigo-300">%user%</code>, <code class="text-indigo-300">%reward%</code>, <code class="text-indigo-300">%description%</code>, <code class="text-indigo-300">%duration%</code>, <code class="text-indigo-300">%platform%</code>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- TAB 2: 100+ MASTER STYLES & 100+ ALERT STYLES -->
+        <div id="tab-styles" class="tab-pane hidden space-y-5">
+
+          <!-- 108 Master Display Styles (Layout + Avatar Geometry + Card Structure) -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-layer-group text-pink-400"></i>
+                  100+ Master Display Layouts
+                </label>
+                <p class="text-[11px] text-slate-400">108 Combined Alert + Timer + Avatar Geometry Presets</p>
+              </div>
+              <span id="masterStyleCountBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-pink-500/20 text-pink-300 border border-pink-500/30">#1 / 108</span>
+            </div>
+
+            <div class="flex gap-1.5">
+              <button onclick="stepPreset('masterStyle', -1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+              <select id="selectMasterStyle" onchange="onSelectPreset('masterStyle', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-medium"></select>
+              <button onclick="stepPreset('masterStyle', 1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+              <button onclick="randomPreset('masterStyle')" class="px-3 py-2 rounded-xl bg-pink-600/25 hover:bg-pink-600/40 border border-pink-500/40 text-pink-200 text-xs" title="Random Master Layout"><i class="fa-solid fa-shuffle"></i></button>
+            </div>
+          </div>
+
+          <!-- 108 Alert Card Visual Themes -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-paintbrush text-purple-400"></i>
+                  100+ Alert Card Styles
+                </label>
+                <p class="text-[11px] text-slate-400">108 Visual Themes for Title, Description & User Profile</p>
+              </div>
+              <span id="alertStyleCountBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">#1 / 108</span>
+            </div>
+
+            <input type="text" id="searchAlertStyle" oninput="filterSelectOptions('selectAlertStyle', this.value, 'alertStyles')" placeholder="Search 108 alert styles (e.g. Cyber, Twitch, Kick, Gold, Retro)..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200" />
+
+            <div class="flex gap-1.5">
+              <button onclick="stepPreset('alertStyle', -1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+              <select id="selectAlertStyle" onchange="onSelectPreset('alertStyle', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-medium"></select>
+              <button onclick="stepPreset('alertStyle', 1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+              <button onclick="randomPreset('alertStyle')" class="px-3 py-2 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 border border-purple-500/40 text-purple-200 text-xs" title="Random Alert Style"><i class="fa-solid fa-shuffle"></i></button>
+            </div>
+
+            <!-- Synced Custom Alert Duration Control inside Alert Styles Tab -->
+            <div class="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-2">
+              <div class="text-[11px] text-slate-300 font-semibold flex items-center gap-1.5">
+                <i class="fa-regular fa-clock text-purple-400"></i>
+                <span>Show Alert For:</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <input type="number" id="cfgAlertHoldSecStyles" value="6" min="1" max="600" step="0.5" oninput="setAlertHoldSeconds(this.value, false)" class="w-16 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-purple-200 text-center" />
+                <span class="text-[11px] text-slate-400 font-mono">sec</span>
+              </div>
+            </div>
+
+            <button onclick="previewCurrentAlertStyle()" class="w-full py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/35 border border-purple-500/40 text-purple-200 text-xs font-bold transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-eye"></i>
+              <span>Preview Selected Alert Style Now</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- TAB 3: 100+ TIMER STYLES & 100+ IN/OUT ANIMATION EFFECTS -->
+        <div id="tab-timers" class="tab-pane hidden space-y-5">
+
+          <!-- 108 Countdown Timer Styles -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-hourglass-half text-emerald-400"></i>
+                  100+ Countdown Timer Styles
+                </label>
+                <p class="text-[11px] text-slate-400">108 HUDs, Progress Bars, Rings, Pills & LED Tickers</p>
+              </div>
+              <span id="timerStyleCountBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">#1 / 108</span>
+            </div>
+
+            <input type="text" id="searchTimerStyle" oninput="filterSelectOptions('selectTimerStyle', this.value, 'timerStyles')" placeholder="Search 108 timer styles (e.g. Ring, Neon Bar, LED, Pill)..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200" />
+
+            <div class="flex gap-1.5">
+              <button onclick="stepPreset('timerStyle', -1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+              <select id="selectTimerStyle" onchange="onSelectPreset('timerStyle', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-medium"></select>
+              <button onclick="stepPreset('timerStyle', 1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+              <button onclick="randomPreset('timerStyle')" class="px-3 py-2 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-200 text-xs"><i class="fa-solid fa-shuffle"></i></button>
+            </div>
+          </div>
+
+          <!-- 108 In/Out Motion Effects -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-wand-sparkles text-cyan-400"></i>
+                  100+ In / Out Motion Effects
+                </label>
+                <p class="text-[11px] text-slate-400">108 Entry & Exit Transitions + Random Mode on Each Alert/Timer</p>
+              </div>
+              <span id="fxCountBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">🎲 RANDOM</span>
+            </div>
+
+            <!-- Random In/Out Controls Box -->
+            <div class="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-extrabold text-cyan-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-dice text-cyan-400"></i>
+                  Randomize In/Out Effects Automatically
+                </span>
+                <button onclick="enableRandomEffectsForBoth()" class="text-[10px] px-2 py-0.5 rounded-lg bg-cyan-500/25 hover:bg-cyan-500/40 text-cyan-100 font-bold border border-cyan-400/40 transition">
+                  🎲 Enable Both
+                </button>
+              </div>
+
+              <label class="flex items-center justify-between cursor-pointer pt-1">
+                <div>
+                  <span class="text-xs font-semibold text-white block">🎲 Random In/Out on Every Alert</span>
+                  <span class="text-[10px] text-slate-300">Picks a fresh effect (#1–#108) every time a reward alert pops up</span>
+                </div>
+                <input type="checkbox" id="cfgRandomEffectOnAlert" checked onchange="updateConfigFromUI()" class="w-4 h-4 accent-cyan-400 rounded" />
+              </label>
+
+              <label class="flex items-center justify-between cursor-pointer pt-1 border-t border-cyan-500/20">
+                <div>
+                  <span class="text-xs font-semibold text-white block">🎲 Random In/Out on Every Timer</span>
+                  <span class="text-[10px] text-slate-300">Picks a fresh effect (#1–#108) for each countdown timer entrance & exit</span>
+                </div>
+                <input type="checkbox" id="cfgRandomEffectOnTimer" checked onchange="updateConfigFromUI()" class="w-4 h-4 accent-cyan-400 rounded" />
+              </label>
+            </div>
+
+            <input type="text" id="searchInOutFx" oninput="filterSelectOptions('selectInOutFx', this.value, 'inOutEffects')" placeholder="Search 108 effects (e.g. Glitch, Bounce, 3D Flip, Cyber)..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200" />
+
+            <div class="flex gap-1.5">
+              <button onclick="stepPreset('inOutFx', -1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+              <select id="selectInOutFx" onchange="onSelectPreset('inOutFx', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-medium"></select>
+              <button onclick="stepPreset('inOutFx', 1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+              <button onclick="randomPreset('inOutFx')" class="px-3 py-2 rounded-xl bg-cyan-600/25 hover:bg-cyan-600/40 border border-cyan-500/40 text-cyan-200 text-xs" title="Pick a random effect to preview"><i class="fa-solid fa-shuffle"></i></button>
+            </div>
+
+            <button onclick="replaySelectedAnimation()" class="w-full py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/35 border border-cyan-500/40 text-cyan-200 text-xs font-bold transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-play"></i>
+              <span>Test In/Out Transition on Stage</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- TAB 4: 100+ ALERT SOUNDS & 100+ TIMER COMPLETION SOUNDS -->
+        <div id="tab-sounds" class="tab-pane hidden space-y-5">
+
+          <!-- Master Volume -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-amber-400"></i>
+                Master Audio Synthesizer Volume
+              </label>
+              <span id="volLabel" class="text-xs font-mono text-amber-300">80%</span>
+            </div>
+            <input type="range" id="cfgVolume" min="0" max="100" value="80" oninput="updateVolumeUI(this.value)" class="w-full accent-amber-400" />
+          </div>
+
+          <!-- 108 Alert Trigger Sounds -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-bell text-purple-400"></i>
+                  100+ Alert Display Sounds
+                </label>
+                <p class="text-[11px] text-slate-400">Plays immediately when a reward alert pops up</p>
+              </div>
+              <span id="alertSoundCountBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">#1 / 108</span>
+            </div>
+
+            <div class="flex gap-1.5">
+              <button onclick="stepPreset('alertSound', -1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+              <select id="selectAlertSound" onchange="onSelectPreset('alertSound', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-medium"></select>
+              <button onclick="stepPreset('alertSound', 1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+              <button onclick="playAlertSound()" class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-play"></i> Play
+              </button>
+            </div>
+
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">Optional Custom Alert Audio URL (.mp3/.ogg/.wav override):</label>
+              <input type="text" id="cfgCustomAlertAudioUrl" placeholder="Leave blank to use built-in 108 WebAudio Synth" onchange="updateConfigFromUI()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300" />
+            </div>
+          </div>
+
+          <!-- 108 Timer Finished / Time-Up Sounds -->
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-hourglass-end text-emerald-400"></i>
+                  100+ Timer Completion Sounds
+                </label>
+                <p class="text-[11px] text-slate-400">Plays when countdown reaches 00:00</p>
+              </div>
+              <span id="timerSoundCountBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">#1 / 108</span>
+            </div>
+
+            <div class="flex gap-1.5">
+              <button onclick="stepPreset('timerSound', -1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+              <select id="selectTimerSound" onchange="onSelectPreset('timerSound', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-medium"></select>
+              <button onclick="stepPreset('timerSound', 1)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+              <button onclick="playTimerEndSound()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-play"></i> Play
+              </button>
+            </div>
+
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">Optional Custom Timer End Audio URL (.mp3/.ogg/.wav override):</label>
+              <input type="text" id="cfgCustomTimerAudioUrl" placeholder="Leave blank to use built-in 108 WebAudio Synth" onchange="updateConfigFromUI()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300" />
+            </div>
+          </div>
+
+        </div>
+
+        <!-- TAB 5: CUSTOM SIMULATOR & PARSER TEST LAB -->
+        <div id="tab-simulator" class="tab-pane hidden space-y-4">
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+              <i class="fa-solid fa-satellite-dish text-amber-400"></i>
+              Custom Channel Reward Simulator
+            </label>
+            <p class="text-[11px] text-slate-400 leading-relaxed">
+              Test how the overlay scans descriptions for <code class="text-emerald-300">(5:00)</code>, <code class="text-emerald-300">(1:00:00)</code>, or <code class="text-emerald-300">(1:0:0)</code>, stacks active timers, moves the newest timed reward to the top, and sends chat messages.
+            </p>
+
+            <!-- Platform Toggle -->
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" id="simPlatformTwitch" onclick="setSimPlatform('twitch')" class="py-2 rounded-xl border border-[#9146FF] bg-[#9146FF]/25 text-white text-xs font-bold flex items-center justify-center gap-2">
+                <i class="fa-brands fa-twitch text-[#9146FF]"></i> Twitch Reward
+              </button>
+              <button type="button" id="simPlatformKick" onclick="setSimPlatform('kick')" class="py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-bold flex items-center justify-center gap-2">
+                <i class="fa-solid fa-k text-[#53FC18]"></i> Kick Reward
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[11px] text-slate-400 block mb-1">Redeemer Username</label>
+                <input type="text" id="simUser" value="ValkyraeFan99" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white" />
+              </div>
+              <div>
+                <label class="text-[11px] text-slate-400 block mb-1">Avatar Preset</label>
+                <select id="simAvatar" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white">
+                  <option value="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80">Cyber Girl Avatar</option>
+                  <option value="https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=160&auto=format&fit=crop&q=80">Esports Pro Avatar</option>
+                  <option value="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160&auto=format&fit=crop&q=80">Streamer Hoodie</option>
+                  <option value="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=160&auto=format&fit=crop&q=80">Neon Gamer</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[11px] text-slate-400 block mb-1">Reward Title (Displayed on Top)</label>
+              <input type="text" id="simTitle" value="Invert Mouse & No Jump Challenge" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-semibold" />
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-[11px] text-slate-400">Reward Description (Put time at end)</label>
+                <div class="flex gap-1">
+                  <button onclick="appendSimTime('(0:12)')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-mono">(0:12)</button>
+                  <button onclick="appendSimTime('(5:00)')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 font-mono">(5:00)</button>
+                  <button onclick="appendSimTime('(1:00:00)')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono">(1:00:00)</button>
+                  <button onclick="appendSimTime('(1:0:0)')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-purple-300 font-mono">(1:0:0)</button>
+                </div>
+              </div>
+              <textarea id="simDescription" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200">You must invert mouse look and unbind jump for the next match! (5:00)</textarea>
+            </div>
+
+            <button onclick="fireCustomSimulation()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-lg flex items-center justify-center gap-2 transition">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>Trigger Simulated Reward Alert + Timer</span>
+            </button>
+
+            <!-- Active Timer Controls -->
+            <div class="pt-3 border-t border-slate-800 grid grid-cols-2 gap-2">
+              <button onclick="fastForwardAllTimersTo3Sec()" class="py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-forward-fast"></i>
+                <span>Set Timers to 3s Left</span>
+              </button>
+              <button onclick="clearAllTimers()" class="py-2 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-[11px] font-bold flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>Clear Active Timers</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Sidebar Footer Summary -->
+      <div class="p-3 bg-[#090c12] border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+        <span>Regex Parser: <code class="text-emerald-400 font-mono">(MM:SS)</code> & <code class="text-cyan-400 font-mono">(H:MM:SS)</code></span>
+        <span id="activeTimerCounter" class="font-bold text-indigo-300">0 Active Timers</span>
+      </div>
+    </aside>
+
+    <!-- CENTER 16:9 INTERACTIVE OBS PREVIEW STAGE -->
+    <main class="flex-1 flex flex-col bg-[#07090e] overflow-hidden relative">
+
+      <!-- Stage Sub-Toolbar -->
+      <div class="h-11 px-4 border-b border-slate-800/80 bg-[#0b0e16] flex items-center justify-between text-xs shrink-0">
+        <div class="flex items-center gap-3">
+          <span class="font-bold text-slate-300 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            LIVE 1920×1080 OBS STAGE PREVIEW
+          </span>
+          <span class="text-slate-500 hidden md:inline">|</span>
+          <span id="activePresetSummary" class="text-[11px] text-slate-400 hidden md:inline font-mono"></span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Backdrop Switcher -->
+          <button onclick="setStageBackdrop('game')" id="bgBtn-game" class="px-2.5 py-1 rounded-lg bg-indigo-600/30 border border-indigo-500/50 text-indigo-200 text-[11px] font-medium">Stream Backdrop</button>
+          <button onclick="setStageBackdrop('checker')" id="bgBtn-checker" class="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-medium">OBS Transparency</button>
+          <button onclick="toggleChatDrawer()" class="px-2.5 py-1 rounded-lg bg-purple-600/25 border border-purple-500/40 text-purple-200 text-[11px] font-semibold flex items-center gap-1.5">
+            <i class="fa-solid fa-message"></i>
+            <span>Chat Feed</span>
+            <span id="chatCountBadge" class="px-1.5 py-0.2 bg-purple-500 text-white rounded-full text-[10px]">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 16:9 Scaled Stage Container -->
+      <div class="flex-1 flex items-center justify-center p-4 md:p-6 overflow-hidden relative">
+        
+        <div id="obsPreviewStage" class="w-full max-w-[1200px] aspect-video rounded-2xl border border-slate-800 shadow-2xl relative overflow-hidden obs-game-backdrop flex">
+          
+          <!-- Decorative Mock Stream HUD Watermark (only in preview, not in exported OBS file) -->
+          <div class="absolute inset-0 pointer-events-none flex flex-col justify-between p-5 opacity-35">
+            <div class="flex justify-between items-center">
+              <div class="flex items-center gap-2 bg-black/50 px-3 py-1 rounded-full border border-white/10 text-[11px] font-mono">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                <span>OBS BROWSER SOURCE CANVAS (1920x1080)</span>
+              </div>
+              <div class="text-[11px] font-mono bg-black/50 px-3 py-1 rounded-full border border-white/10">
+                Position: <span id="stagePosWatermark">bottom-right</span>
+              </div>
+            </div>
+            <div class="text-center text-xs font-mono text-slate-400">
+              Trigger a Twitch or Kick reward above to preview Alert + Countdown Timer Stacking
+            </div>
+          </div>
+
+          <!-- ACTUAL OVERLAY MOUNT ROOT (Identical structure to exported OBS HTML) -->
+          <div id="overlayRoot" class=" absolute inset-0 pointer-events-none p-6 flex flex-col justify-end items-end transition-all duration-300">
+            
+            <!-- Wrapper that holds Main Alert Card + Active Timer Stack -->
+            <div id="overlayAnchor" class="w-full max-w-[440px] flex flex-col gap-3 pointer-events-auto transition-transform duration-300" style="transform: scale(1);">
+              
+              <!-- 1. PRIMARY REWARD ALERT POPUP CONTAINER -->
+              <div id="alertPopupSlot" class="w-full"></div>
+
+              <!-- 2. ACTIVE COUNTDOWN TIMERS STACK (Newest/Updated Timed Reward Moves to Top) -->
+              <div id="activeTimersStack" class="w-full flex flex-col gap-2.5"></div>
+
+            </div>
+
+          </div>
+
+          <!-- SIMULATED TWITCH & KICK CHAT BOX OVERLAY (Bottom-Left or toggleable drawer) -->
+          <div id="simulatedChatPanel" class="absolute left-4 bottom-4 w-80 sm:w-96 max-h-[68%] bg-[#0b0e17]/95 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-20 transition-all">
+            <div class="px-3.5 py-2 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-comments text-emerald-400 text-xs"></i>
+                <span class="text-xs font-bold tracking-wide text-slate-200">Platform Chat Output Log</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button onclick="clearChatLog()" class="text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800">Clear</button>
+                <button onclick="toggleChatDrawer()" class="text-slate-400 hover:text-white text-xs px-1"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+            </div>
+            <div id="chatMessagesList" class="p-3 space-y-2 overflow-y-auto text-xs flex-1 max-h-64">
+              <div class="text-[11px] text-slate-400 italic">
+                Chat messages sent to Twitch or Kick on reward redemption and when a timer expires will appear here...
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- MODAL: C# STREAMER.BOT SCRIPT & SETUP GUIDE -->
+  <div id="csharpModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-[#0e131f] border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 bg-[#090d15] border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold">
+            C#
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white">Streamer.bot C# Action Script (Twitch & Kick + Auto Timer + Chat)</h2>
+            <p class="text-xs text-slate-400">Grabs Twitch/Kick Reward info, User Avatar, parses <code class="text-emerald-300">(5:00)</code> or <code class="text-emerald-300">(1:00:00)</code>, broadcasts to overlay, and sends start/end chat messages.</p>
+          </div>
+        </div>
+        <button onclick="closeCSharpModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-4 flex-1">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-xl">
+            <div class="font-bold text-indigo-300 mb-1">1. Chat Actions (No C# Needed!)</div>
+            <p class="text-slate-400">Create your Twitch & Kick Actions in Streamer.bot using standard Sub-Actions (<strong class="text-white">Twitch/Kick &rarr; Chat &rarr; Send Message to Channel</strong>) and put <code class="text-emerald-300 font-mono">%rewardMessage%</code> or <code class="text-emerald-300 font-mono">%timerMessage%</code> (or <code class="text-emerald-300 font-mono">%chatMessage%</code>) as the message text.</p>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-xl">
+            <div class="font-bold text-purple-300 mb-1">2. Select Actions in Dropdowns</div>
+            <p class="text-slate-400">In the <strong class="text-white">Position/WS</strong> tab on the left, select your Twitch & Kick Redeemed and Timer Finished Actions from the 4 dropdown boxes.</p>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-xl">
+            <div class="font-bold text-emerald-300 mb-1">3. Optional C# Timer/Avatar Helper</div>
+            <p class="text-slate-400">The overlay already listens to native Twitch/Kick Reward Redemptions automatically. If you want C# to pre-parse timers & avatars, paste the helper script below into your reward trigger Action.</p>
+          </div>
+        </div>
+
+        <div class="relative">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-mono text-slate-400">RewardOverlay_BroadcastHelper.cs (Broadcasts Reward + Timer to Overlay; Chat is handled by your selected Actions)</span>
+            <button onclick="copyCSharpCode()" id="copyCSharpBtn" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-copy"></i>
+              <span>Copy C# Script</span>
+            </button>
+          </div>
+          <pre id="csharpCodeBlock" class="bg-[#070a10] border border-slate-800 rounded-xl p-4 text-xs font-mono text-emerald-300 overflow-x-auto leading-relaxed select-all max-h-[420px]"></pre>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-3 bg-[#090d15] border-t border-slate-800 flex items-center justify-between">
+        <span class="text-xs text-slate-400">Enable Streamer.bot WebSocket Server under <strong>Servers/Clients &rarr; WebSocket Server</strong> (<code class="text-indigo-300">127.0.0.1:8080</code>).</span>
+        <button onclick="closeCSharpModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION BANNER -->
+  <div id="toastBanner" class="fixed bottom-5 right-5 z-50 pointer-events-none opacity-0 translate-y-3 transition-all duration-300">
+    <div class="bg-slate-900/95 border border-indigo-500/50 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-semibold">
+      <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+      <span id="toastMessage">Saved!</span>
+    </div>
+  </div>
+
+  <!-- APPLICATION SCRIPT -->
+  <script>
+    /*************************************************************************
+     * 1. PROCEDURAL 108+ PRESETS GENERATOR ENGINE
+     * Generates 108 distinct presets for each of the 5 required categories:
+     * - 108 In/Out Motion Effects
+     * - 108 Alert Card Styles
+     * - 108 Countdown Timer Styles
+     * - 108 Master Display Styles (Layout + Avatar + Typography)
+     * - 108 Alert Trigger Sounds (WebAudio Synthesizer)
+     * - 108 Timer Completion Sounds (WebAudio Synthesizer)
+     *************************************************************************/
+
+    const CATALOG = {
+      masterStyles: [],
+      alertStyles: [],
+      timerStyles: [],
+      inOutEffects: [],
+      alertSounds: [],
+      timerSounds: []
+    };
+
+    function buildAll108Catalogs() {
+      // --- A. 108 MASTER DISPLAY STYLES (12 Layout Archetypes x 9 Avatar/Frame Geometries = 108) ---
+      const layoutArchetypes = [
+        { name: "Broadcast Pro Banner", dir: "row", align: "left", font: "font-sans", badgePos: "top-right", pad: "p-4", radius: "rounded-2xl" },
+        { name: "Cyber HUD Centered", dir: "col", align: "center", font: "font-orbitron", badgePos: "top-right", pad: "p-5", radius: "rounded-xl" },
+        { name: "Esports Championship Split", dir: "row", align: "left", font: "font-rajdhani", badgePos: "bottom-right", pad: "p-4", radius: "rounded-lg" },
+        { name: "Compact Stream Pill", dir: "row", align: "left", font: "font-sans", badgePos: "inline", pad: "p-3.5", radius: "rounded-3xl" },
+        { name: "Right-Aligned Tactical", dir: "row-reverse", align: "right", font: "font-mono-tech", badgePos: "top-left", pad: "p-4", radius: "rounded-xl" },
+        { name: "Arcade Retro Box", dir: "row", align: "left", font: "font-arcade", badgePos: "top-right", pad: "p-4", radius: "rounded-none" },
+        { name: "Vertical Showcase Poster", dir: "col", align: "center", font: "font-righteous", badgePos: "inline", pad: "p-5", radius: "rounded-3xl" },
+        { name: "Minimalist Floating Strip", dir: "row", align: "left", font: "font-sans", badgePos: "inline", pad: "p-3", radius: "rounded-xl" },
+        { name: "Futuristic Holo-Deck", dir: "row", align: "left", font: "font-orbitron", badgePos: "bottom-right", pad: "p-4", radius: "rounded-2xl" },
+        { name: "Reverse Neon Showcase", dir: "row-reverse", align: "right", font: "font-rajdhani", badgePos: "top-left", pad: "p-4", radius: "rounded-2xl" },
+        { name: "Widescreen Cinema Card", dir: "row", align: "left", font: "font-sans", badgePos: "top-right", pad: "p-5", radius: "rounded-2xl" },
+        { name: "Terminal Code Readout", dir: "row", align: "left", font: "font-mono-tech", badgePos: "inline", pad: "p-3.5", radius: "rounded-md" }
+      ];
+
+      const avatarGeometries = [
+        { label: "Circle Halo", clip: "avatar-circle", size: "w-14 h-14", ring: "ring-2 ring-white/40" },
+        { label: "Squircle Pro", clip: "avatar-squircle", size: "w-14 h-14", ring: "ring-2 ring-indigo-400/60" },
+        { label: "Hexagon Mecha", clip: "avatar-hex", size: "w-14 h-14", ring: "" },
+        { label: "Diamond Prism", clip: "avatar-diamond", size: "w-14 h-14", ring: "" },
+        { label: "Octagon Tactical", clip: "avatar-octagon", size: "w-14 h-14", ring: "" },
+        { label: "Esports Shield", clip: "avatar-shield", size: "w-14 h-14", ring: "" },
+        { label: "Rounded Cube", clip: "avatar-rounded", size: "w-14 h-14", ring: "ring-2 ring-emerald-400/50" },
+        { label: "Sharp Frame", clip: "avatar-sharp", size: "w-14 h-14", ring: "ring-2 ring-purple-400/60" },
+        { label: "XL Broadcast Circle", clip: "avatar-circle", size: "w-16 h-16", ring: "ring-4 ring-white/25" }
+      ];
+
+      let mIdx = 1;
+      for (const arch of layoutArchetypes) {
+        for (const av of avatarGeometries) {
+          CATALOG.masterStyles.push({
+            id: mIdx - 1,
+            name: `#${mIdx} - ${arch.name} (${av.label})`,
+            dir: arch.dir,
+            align: arch.align,
+            font: arch.font,
+            badgePos: arch.badgePos,
+            pad: arch.pad,
+            radius: arch.radius,
+            avatarClip: av.clip,
+            avatarSize: av.size,
+            avatarRing: av.ring
+          });
+          mIdx++;
+        }
+      }
+
+      // --- B. 108 ALERT CARD VISUAL STYLES (18 Color Palettes x 6 Surface Treatments = 108) ---
+      const palettes = [
+        { name: "Twitch Hyper Purple", bg1: "#1a1033", bg2: "#2d1657", accent: "#9146FF", text: "#ffffff", sub: "#d8b4fe", glow: "rgba(145,70,255,0.55)" },
+        { name: "Kick Radioactive Neon", bg1: "#091f0c", bg2: "#103817", accent: "#53FC18", text: "#ffffff", sub: "#bbf7d0", glow: "rgba(83,252,24,0.55)" },
+        { name: "Cyberpunk NightCity", bg1: "#1f1905", bg2: "#2e1025", accent: "#facc15", text: "#fef08a", sub: "#f472b6", glow: "rgba(250,204,21,0.55)" },
+        { name: "Synthwave Outrun 84", bg1: "#190b28", bg2: "#3b0736", accent: "#ff2a85", text: "#ffffff", sub: "#67e8f9", glow: "rgba(255,42,133,0.55)" },
+        { name: "Obsidian Stealth Pro", bg1: "#090b10", bg2: "#161b26", accent: "#38bdf8", text: "#f8fafc", sub: "#94a3b8", glow: "rgba(56,189,248,0.4)" },
+        { name: "Esports Championship Gold", bg1: "#1c1608", bg2: "#2e230a", accent: "#fbbf24", text: "#fffbeb", sub: "#fde68a", glow: "rgba(251,191,36,0.5)" },
+        { name: "Crimson Blood Moon", bg1: "#24070b", bg2: "#3d0a11", accent: "#f43f5e", text: "#fff1f2", sub: "#fda4af", glow: "rgba(244,63,94,0.55)" },
+        { name: "Arctic Frost Crystal", bg1: "#081c29", bg2: "#0d2f45", accent: "#22d3ee", text: "#ecfeff", sub: "#a5f3fc", glow: "rgba(34,211,238,0.55)" },
+        { name: "Emerald Matrix Code", bg1: "#04170c", bg2: "#072916", accent: "#10b981", text: "#ecfdf5", sub: "#6ee7b7", glow: "rgba(16,185,129,0.55)" },
+        { name: "Vaporwave Sunset Miami", bg1: "#211030", bg2: "#3d1635", accent: "#fb7185", text: "#fff1f2", sub: "#fdba74", glow: "rgba(251,113,133,0.5)" },
+        { name: "Molten Magma Core", bg1: "#240d04", bg2: "#401706", accent: "#f97316", text: "#fff7ed", sub: "#fdba74", glow: "rgba(249,115,22,0.55)" },
+        { name: "Royal Amethyst Velvet", bg1: "#180b29", bg2: "#2c124d", accent: "#c084fc", text: "#faf5ff", sub: "#e9d5ff", glow: "rgba(192,132,252,0.55)" },
+        { name: "Cobalt Laser Tactical", bg1: "#07122b", bg2: "#102352", accent: "#60a5fa", text: "#eff6ff", sub: "#bfdbfe", glow: "rgba(96,165,250,0.55)" },
+        { name: "Toxic Biohazard Lime", bg1: "#141f05", bg2: "#243809", accent: "#a3e635", text: "#f7fee7", sub: "#d9f99d", glow: "rgba(163,230,53,0.55)" },
+        { name: "Sakura Cherry Blossom", bg1: "#260d1c", bg2: "#421631", accent: "#f472b6", text: "#fdf2f8", sub: "#fbcfe8", glow: "rgba(244,114,182,0.5)" },
+        { name: "Titanium Mecha Alloy", bg1: "#111827", bg2: "#1f2937", accent: "#e5e7eb", text: "#ffffff", sub: "#9ca3af", glow: "rgba(229,231,235,0.35)" },
+        { name: "Deep Nebula Violet", bg1: "#0d0926", bg2: "#1b1447", accent: "#818cf8", text: "#eef2ff", sub: "#c7d2fe", glow: "rgba(129,140,248,0.55)" },
+        { name: "Solar Flare Gold-Cyan", bg1: "#0c1926", bg2: "#1f1b12", accent: "#f59e0b", text: "#ffffff", sub: "#38bdf8", glow: "rgba(245,158,11,0.5)" }
+      ];
+
+      const surfaceTreatments = [
+        { suffix: "Neon Border Glow", borderStyle: "2px solid", topBar: true, scanline: false, glass: false },
+        { suffix: "Frosted Glassmorphism", borderStyle: "1px solid", topBar: false, scanline: false, glass: true },
+        { suffix: "Cyber Scanline Grid", borderStyle: "2px solid", topBar: true, scanline: true, glass: false },
+        { suffix: "Heavy Broadcast Frame", borderStyle: "3px solid", topBar: true, scanline: false, glass: false },
+        { suffix: "Dual-Accent Tech Strip", borderStyle: "1px solid", topBar: true, scanline: true, glass: true },
+        { suffix: "Minimalist Shadow Luxe", borderStyle: "1px solid", topBar: false, scanline: false, glass: false }
+      ];
+
+      let aIdx = 1;
+      for (const pal of palettes) {
+        for (const surf of surfaceTreatments) {
+          CATALOG.alertStyles.push({
+            id: aIdx - 1,
+            name: `#${aIdx} - ${pal.name} • ${surf.suffix}`,
+            bg1: pal.bg1,
+            bg2: pal.bg2,
+            accent: pal.accent,
+            text: pal.text,
+            sub: pal.sub,
+            glow: pal.glow,
+            borderStyle: surf.borderStyle,
+            topBar: surf.topBar,
+            scanline: surf.scanline,
+            glass: surf.glass
+          });
+          aIdx++;
+        }
+      }
+
+      // --- C. 108 COUNTDOWN TIMER STYLES (9 Structural Timer Archetypes x 12 Color Themes = 108) ---
+      const timerArchetypes = [
+        { type: "neon-bar", label: "Neon Progress Bar Card" },
+        { type: "circular-ring", label: "Circular SVG Ring HUD" },
+        { type: "segmented-led", label: "Segmented LED Digital Bar" },
+        { type: "compact-pill", label: "Broadcast Compact Pill" },
+        { type: "cyber-tactical", label: "Cyber Tactical Readout" },
+        { type: "dual-split", label: "Dual-Tone Split Timer" },
+        { type: "glass-capsule", label: "Frosted Glass Capsule" },
+        { type: "arcade-7seg", label: "Retro Arcade Ticker" },
+        { type: "holo-strip", label: "Holographic Bottom Strip" }
+      ];
+
+      const timerPalettes = palettes.slice(0, 12);
+      let tIdx = 1;
+      for (const arch of timerArchetypes) {
+        for (const pal of timerPalettes) {
+          CATALOG.timerStyles.push({
+            id: tIdx - 1,
+            name: `#${tIdx} - ${arch.label} (${pal.name})`,
+            archetype: arch.type,
+            bg1: pal.bg1,
+            bg2: pal.bg2,
+            accent: pal.accent,
+            text: pal.text,
+            sub: pal.sub,
+            glow: pal.glow
+          });
+          tIdx++;
+        }
+      }
+
+      // --- D. 108 IN / OUT ANIMATION EFFECTS (18 Motion Families x 6 Speed/Directional Variants = 108) ---
+      const motionFamilies = [
+        { name: "Slide Thrust", inTx: "translateX(120%)", outTx: "translateX(120%)" },
+        { name: "Slide From Left", inTx: "translateX(-120%)", outTx: "translateX(-120%)" },
+        { name: "Drop From Sky", inTx: "translateY(-130%)", outTx: "translateY(-130%)" },
+        { name: "Rise From Floor", inTx: "translateY(130%)", outTx: "translateY(130%)" },
+        { name: "Elastic Pop Zoom", inTx: "scale(0.15)", outTx: "scale(0.1)" },
+        { name: "Hyper Zoom Overdrive", inTx: "scale(2.1)", outTx: "scale(0.05)" },
+        { name: "3D Flip Horizontal", inTx: "perspective(700px) rotateX(88deg)", outTx: "perspective(700px) rotateX(-88deg)" },
+        { name: "3D Flip Vertical", inTx: "perspective(700px) rotateY(88deg)", outTx: "perspective(700px) rotateY(-88deg)" },
+        { name: "Cyber Skew Slash", inTx: "skewX(-38deg) translateX(90%)", outTx: "skewX(38deg) translateX(90%)" },
+        { name: "Vortex Spin-In", inTx: "rotate(-180deg) scale(0.1)", outTx: "rotate(180deg) scale(0.1)" },
+        { name: "Spiral Matrix Drop", inTx: "translateY(-90%) rotate(25deg) scale(0.5)", outTx: "translateY(90%) rotate(-25deg) scale(0.5)" },
+        { name: "Origami Unfold", inTx: "perspective(600px) rotateX(-75deg) scaleY(0.2)", outTx: "perspective(600px) rotateX(75deg) scaleY(0.1)" },
+        { name: "Neon Whip Snap", inTx: "translateX(80%) skewX(25deg) scale(0.8)", outTx: "translateX(-80%) skewX(-25deg) scale(0.8)" },
+        { name: "Pendulum Swing", inTx: "rotate(35deg) translateY(-80%)", outTx: "rotate(-35deg) translateY(80%)" },
+        { name: "Glitch Teleport", inTx: "scaleX(1.8) scaleY(0.05)", outTx: "scaleX(2.0) scaleY(0.02)" },
+        { name: "Diagonal Meteor", inTx: "translate(100%, -100%) scale(0.4)", outTx: "translate(-100%, 100%) scale(0.4)" },
+        { name: "Shutter Expand", inTx: "scaleY(0.01)", outTx: "scaleY(0.01)" },
+        { name: "Bounce Slingshot", inTx: "translateX(140%) scale(0.6)", outTx: "translateX(140%) scale(0.6)" }
+      ];
+
+      const motionVariants = [
+        { label: "Snappy Spring (450ms)", dur: 450, ease: "cubic-bezier(0.34, 1.56, 0.64, 1)", blur: "0px" },
+        { label: "Ultra Fast (280ms)", dur: 280, ease: "cubic-bezier(0.16, 1, 0.3, 1)", blur: "0px" },
+        { label: "Cinematic Smooth (650ms)", dur: 650, ease: "cubic-bezier(0.22, 1, 0.36, 1)", blur: "8px" },
+        { label: "Heavy Bounce (750ms)", dur: 750, ease: "cubic-bezier(0.68, -0.55, 0.26, 1.55)", blur: "0px" },
+        { label: "Motion Blur Warp (500ms)", dur: 500, ease: "cubic-bezier(0.25, 1, 0.5, 1)", blur: "14px" },
+        { label: "Elastic Overdrive (850ms)", dur: 850, ease: "cubic-bezier(0.34, 1.75, 0.64, 1)", blur: "6px" }
+      ];
+
+      let fxIdx = 1;
+      for (const fam of motionFamilies) {
+        for (const v of motionVariants) {
+          CATALOG.inOutEffects.push({
+            id: fxIdx - 1,
+            name: `#${fxIdx} - ${fam.name} • ${v.label}`,
+            inTx: fam.inTx,
+            outTx: fam.outTx,
+            dur: v.dur,
+            ease: v.ease,
+            blur: v.blur
+          });
+          fxIdx++;
+        }
+      }
+
+      // --- E. 108 ALERT TRIGGER SOUNDS & 108 TIMER COMPLETION SOUNDS ---
+      const alertSoundFamilies = [
+        "Crystal Chime", "Twitch Hype Pluck", "Kick Laser Rise", "Cyberpunk Arpeggio", "Arcade Coin Powerup",
+        "Esports Stinger", "Hologram Bell", "Synthwave Chord", "8-Bit Level Up", "Sub-Bass Impact Drop",
+        "Cosmic Star Twinkle", "Futuristic UI Confirm", "Plasma Charge Ping", "Royal Fanfare Brass", "Kawaii Bubble Pop",
+        "Stealth Sonar Ping", "Matrix Digital Sweep", "Gold Jackpot Cascade"
+      ];
+      const soundKeys = [
+        { label: "C-Major Bright", baseFreq: 523.25, wave: "triangle", tempo: 0.08, notes: [1, 1.25, 1.5, 2] },
+        { label: "E-Minor Cyber", baseFreq: 329.63, wave: "sawtooth", tempo: 0.07, notes: [1, 1.2, 1.5, 1.8, 2] },
+        { label: "G-Mixolydian Hype", baseFreq: 392.00, wave: "sine", tempo: 0.09, notes: [1, 1.25, 1.5, 1.78, 2] },
+        { label: "A-Pentatonic Pro", baseFreq: 440.00, wave: "square", tempo: 0.06, notes: [1, 1.19, 1.33, 1.5, 2] },
+        { label: "F-Lydian Dream", baseFreq: 349.23, wave: "triangle", tempo: 0.10, notes: [1, 1.26, 1.41, 1.5, 2] },
+        { label: "D-Dorian Synth", baseFreq: 587.33, wave: "sine", tempo: 0.075, notes: [1, 1.12, 1.19, 1.5, 2] }
+      ];
+
+      let asIdx = 1;
+      for (let i = 0; i < alertSoundFamilies.length; i++) {
+        for (let j = 0; j < soundKeys.length; j++) {
+          const k = soundKeys[j];
+          CATALOG.alertSounds.push({
+            id: asIdx - 1,
+            name: `#${asIdx} - ${alertSoundFamilies[i]} (${k.label})`,
+            baseFreq: k.baseFreq * (1 + (i % 4) * 0.06),
+            wave: k.wave,
+            tempo: k.tempo,
+            notes: k.notes,
+            modIndex: i
+          });
+          asIdx++;
+        }
+      }
+
+      const timerEndFamilies = [
+        "Time-Up Broadcast Gong", "Digital Alarm Beep-Beep", "Victory Fanfare Horn", "Sci-Fi Shield Deplete", "Arcade Game Over",
+        "Boxing Bell Ding-Ding", "Reactor Cool-Down", "Airhorn Hype Blast", "Crystal Hourglass Finish", "Cyber Mission Complete",
+        "Subwoofer Boom Resolve", "Retro Synth Finale", "Laser Power Down", "Orchestral Hit Bell", "Neon Glitch Stop",
+        "Space Station Alert", "Esports Round Over", "Chime Cascade Complete"
+      ];
+
+      let tsIdx = 1;
+      for (let i = 0; i < timerEndFamilies.length; i++) {
+        for (let j = 0; j < soundKeys.length; j++) {
+          const k = soundKeys[j];
+          CATALOG.timerSounds.push({
+            id: tsIdx - 1,
+            name: `#${tsIdx} - ${timerEndFamilies[i]} (${k.label})`,
+            baseFreq: k.baseFreq * (0.85 + (i % 5) * 0.07),
+            wave: j % 2 === 0 ? "sawtooth" : "square",
+            tempo: k.tempo * 1.15,
+            notes: [2, 1.5, 1.25, 1, 1.5, 2],
+            modIndex: i
+          });
+          tsIdx++;
+        }
+      }
+    }
+
+    /*************************************************************************
+     * 2. STUDIO CONFIGURATION STATE
+     *************************************************************************/
+    const CONFIG = {
+      wsUrl: "ws://127.0.0.1:8080/",
+      // 4 Separate Streamer.bot Action Slots (Twitch Redeemed, Twitch Timer End, Kick Redeemed, Kick Timer End)
+      twitchStartActionName: "Twitch_Reward_Redeemed_Chat",
+      twitchStartActionId: "",
+      twitchEndActionName: "Twitch_Timer_Finished_Chat",
+      twitchEndActionId: "",
+      kickStartActionName: "Kick_Reward_Redeemed_Chat",
+      kickStartActionId: "",
+      kickEndActionName: "Kick_Timer_Finished_Chat",
+      kickEndActionId: "",
+      // Custom Arg Names sent in DoAction args
+      startArgName: "rewardMessage",
+      endArgName: "timerMessage",
+      sendChatOnTests: true,
+      position: "bottom-right",
+      moveNewestToTop: true,
+      alertHoldSec: 6,
+      showAlertHoldBar: true,
+      overlayScale: 100,
+      startChatTemplate: "{user} redeemed {reward} - {description}",
+      endChatTemplate: "{reward} Is Over After {duration}",
+      masterStyleId: 0,
+      alertStyleId: 0,
+      timerStyleId: 0,
+      inOutFxId: 0,
+      randomEffectOnAlert: true,
+      randomEffectOnTimer: true,
+      alertSoundId: 0,
+      timerSoundId: 0,
+      volume: 0.8,
+      customAlertAudioUrl: "",
+      customTimerAudioUrl: ""
+    };
+
+    let simPlatform = "twitch";
+    let activeTimers = []; // Array of { id, redemptionId, platform, user, avatar, title, description, totalSec, remainingSec, durationLabel, fxId, updatedAt }
+    let timerInterval = null;
+    let alertHideTimeout = null;
+    let wsClient = null;
+    let detectedSbActions = []; // Populated from Streamer.bot GetActions
+    let sentChatDedupeSet = new Set(); // Prevents duplicate start/end chat messages per redemptionId
+    let chatMessageCount = 0;
+    let lastChosenAlertFxName = "";
+
+    /*************************************************************************
+     * 3. WEB AUDIO API SYNTHESIZER ENGINE (Plays all 108 Alert & 108 Timer Sounds)
+     *************************************************************************/
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playSynthSound(preset, customUrl, isTimerEnd = false) {
+      if (CONFIG.volume <= 0) return;
+
+      if (customUrl && customUrl.trim().length > 4) {
+        try {
+          const audio = new Audio(customUrl.trim());
+          audio.volume = CONFIG.volume;
+          audio.play().catch(() => {});
+          return;
+        } catch (e) {}
+      }
+
+      try {
+        const ctx = getAudioContext();
+        const now = ctx.currentTime;
+        const notes = preset.notes || [1, 1.25, 1.5, 2];
+        const step = preset.tempo || 0.08;
+
+        notes.forEach((mult, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = preset.wave || "triangle";
+          const startTime = now + idx * step;
+          const dur = step * (isTimerEnd ? 1.8 : 1.5);
+
+          let freq = preset.baseFreq * mult;
+          if (preset.modIndex % 3 === 1 && idx === notes.length - 1) {
+            freq *= 1.25;
+          }
+          osc.frequency.setValueAtTime(freq, startTime);
+          if (isTimerEnd && idx === notes.length - 1) {
+            osc.frequency.exponentialRampToValueAtTime(freq * 1.15, startTime + dur);
+          }
+
+          const peakGain = Math.min(0.35, 0.25 * CONFIG.volume);
+          gain.gain.setValueAtTime(0.0001, startTime);
+          gain.gain.exponentialRampToValueAtTime(peakGain, startTime + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start(startTime);
+          osc.stop(startTime + dur + 0.02);
+        });
+      } catch (err) {
+        console.warn("Audio playback skipped:", err);
+      }
+    }
+
+    function playAlertSound() {
+      const preset = CATALOG.alertSounds[CONFIG.alertSoundId] || CATALOG.alertSounds[0];
+      playSynthSound(preset, CONFIG.customAlertAudioUrl, false);
+    }
+
+    function playTimerEndSound() {
+      const preset = CATALOG.timerSounds[CONFIG.timerSoundId] || CATALOG.timerSounds[0];
+      playSynthSound(preset, CONFIG.customTimerAudioUrl, true);
+    }
+
+    /*************************************************************************
+     * 4. REWARD DESCRIPTION TIMER PARSER
+     * Scans description (and title fallback) for (5:00) -> 5m 0s, (1:00:00) or (1:0:0) -> 1h 0m 0s
+     *************************************************************************/
+    function parseRewardTimerFromDescription(descriptionText, titleFallback = "") {
+      const combined = `${descriptionText || ""} ${titleFallback || ""}`.trim();
+      if (!combined) return null;
+
+      // Priority 1: End of descriptionText
+      const endRegex = /\(\s*(\d+)\s*:\s*(\d+)(?:\s*:\s*(\d+))?\s*\)\s*$/;
+      const anyRegex = /\(\s*(\d+)\s*:\s*(\d+)(?:\s*:\s*(\d+))?\s*\)/;
+
+      const match = (descriptionText && descriptionText.match(endRegex))
+        || (descriptionText && descriptionText.match(anyRegex))
+        || combined.match(endRegex)
+        || combined.match(anyRegex);
+
+      if (!match) return null;
+
+      let hours = 0, minutes = 0, seconds = 0;
+      if (match[3] !== undefined) {
+        // 3 parts: (H:M:S) or (HH:MM:SS)
+        hours = parseInt(match[1], 10) || 0;
+        minutes = parseInt(match[2], 10) || 0;
+        seconds = parseInt(match[3], 10) || 0;
+      } else {
+        // 2 parts: (M:S) or (MM:SS)
+        minutes = parseInt(match[1], 10) || 0;
+        seconds = parseInt(match[2], 10) || 0;
+      }
+
+      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+      if (totalSeconds <= 0) return null;
+
+      return {
+        totalSeconds,
+        hours,
+        minutes,
+        seconds,
+        rawTag: match[0],
+        formattedDuration: formatHumanDuration(totalSeconds)
+      };
+    }
+
+    function formatHumanDuration(totalSeconds) {
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      const parts = [];
+      if (h > 0) parts.push(`${h} ${h === 1 ? 'Hour' : 'Hours'}`);
+      if (m > 0) parts.push(`${m} ${m === 1 ? 'Min' : 'Mins'}`);
+      if (s > 0 && h === 0) parts.push(`${s} ${s === 1 ? 'Sec' : 'Secs'}`);
+      return parts.length > 0 ? parts.join(' ') : '0 Secs';
+    }
+
+    function formatClockReadout(sec) {
+      const s = Math.max(0, Math.floor(sec));
+      const hrs = Math.floor(s / 3600);
+      const mins = Math.floor((s % 3600) / 60);
+      const secs = s % 60;
+      if (hrs > 0) {
+        return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    /*************************************************************************
+     * 5. ALERT & ACTIVE TIMER RENDERING ENGINE (WITH RANDOM IN/OUT FX SUPPORT)
+     *************************************************************************/
+    function pickAlertInOutEffect(forceSpecificOnly = false) {
+      if (!forceSpecificOnly && CONFIG.randomEffectOnAlert) {
+        const rndIdx = Math.floor(Math.random() * CATALOG.inOutEffects.length);
+        return CATALOG.inOutEffects[rndIdx] || CATALOG.inOutEffects[0];
+      }
+      return CATALOG.inOutEffects[CONFIG.inOutFxId] || CATALOG.inOutEffects[0];
+    }
+
+    function pickTimerInOutEffectId() {
+      if (CONFIG.randomEffectOnTimer) {
+        return Math.floor(Math.random() * CATALOG.inOutEffects.length);
+      }
+      return CONFIG.inOutFxId;
+    }
+
+    async function resolveRealTwitchAvatarIfNeeded(platform, userLogin, currentAvatar) {
+      if (currentAvatar && currentAvatar.startsWith("http") && !currentAvatar.includes("unavatar.io")) {
+        return currentAvatar;
+      }
+      if (platform === "twitch" && userLogin && userLogin !== "Viewer" && userLogin !== "StreamViewer") {
+        try {
+          const resp = await fetch(`https://decapi.me/twitch/avatar/${encodeURIComponent(userLogin)}`);
+          if (resp.ok) {
+            const text = (await resp.text()).trim();
+            if (text.startsWith("http")) return text;
+          }
+        } catch (e) {}
+      }
+      return currentAvatar || `https://unavatar.io/${platform}/${encodeURIComponent(userLogin || "streamer")}`;
+    }
+
+    async function triggerRewardEvent(payload) {
+      const platform = (payload.platform || "twitch").toLowerCase();
+      const user = payload.user || "StreamViewer";
+      const title = payload.title || "Channel Point Reward";
+      const description = payload.description !== undefined ? payload.description : "";
+      const redemptionId = payload.redemptionId || ("red_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7));
+      const startChatAlreadySentByCSharp = !!payload.startChatSent;
+      const isStudioTest = !!payload.isStudioTest;
+
+      const avatar = await resolveRealTwitchAvatarIfNeeded(platform, payload.userLogin || user, payload.avatar);
+
+      // 1. Parse description (and title fallback) for timer: (5:00), (1:00:00), (1:0:0)
+      const timerInfo = payload.durationSeconds
+        ? {
+            totalSeconds: Number(payload.durationSeconds),
+            formattedDuration: payload.humanDuration || formatHumanDuration(Number(payload.durationSeconds))
+          }
+        : parseRewardTimerFromDescription(description, title);
+
+      // 2. Play selected Alert Sound
+      playAlertSound();
+
+      // 3. Pick In/Out Effect for Alert (Random if randomEffectOnAlert is enabled!)
+      const chosenAlertFx = pickAlertInOutEffect(false);
+      lastChosenAlertFxName = chosenAlertFx.name;
+      updatePresetBadges();
+
+      // 4. Render Main Alert Card (Reward Title on top, Description under title, User Profile Pic + Name)
+      renderMainAlertPopup({
+        platform,
+        user,
+        avatar,
+        title,
+        description,
+        timerInfo,
+        fx: chosenAlertFx
+      });
+
+      // 5. Send initial chat message to the platform that the reward was active on:
+      // "[User] redeemed [Reward Name] - [Description of reward]"
+      const cleanDesc = (description || "").trim();
+      const humanDur = timerInfo ? timerInfo.formattedDuration : "Instant";
+      let startChatMsg = formatChatTemplate(CONFIG.startChatTemplate, {
+        user,
+        reward: title,
+        description: cleanDesc,
+        duration: humanDur
+      });
+      // Clean trailing " - " if description was empty
+      if (!cleanDesc) {
+        startChatMsg = startChatMsg.replace(/\s*-\s*$/, "").trim();
+      }
+
+      const shouldSendLiveToSb = (!isStudioTest || CONFIG.sendChatOnTests) && !startChatAlreadySentByCSharp;
+      sendPlatformChatMessage({
+        platform,
+        messageText: startChatMsg,
+        eventPhase: "start",
+        redemptionId,
+        extraVars: {
+          user,
+          reward: title,
+          description: cleanDesc,
+          duration: humanDur
+        },
+        sendToStreamerBot: shouldSendLiveToSb
+      });
+
+      // 6. If reward has a timer, add/promote it to the top of the Active Timers stack!
+      if (timerInfo && timerInfo.totalSeconds > 0) {
+        const timerFxId = pickTimerInOutEffectId();
+        addOrPromoteActiveTimer({
+          id: "timer_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+          redemptionId,
+          platform,
+          user,
+          avatar,
+          title,
+          description: cleanDesc,
+          totalSec: timerInfo.totalSeconds,
+          remainingSec: timerInfo.totalSeconds,
+          durationLabel: timerInfo.formattedDuration,
+          fxId: timerFxId,
+          isStudioTest,
+          updatedAt: Date.now()
+        });
+      }
+    }
+
+    function renderMainAlertPopup(data) {
+      const slot = document.getElementById("alertPopupSlot");
+      if (!slot) return;
+
+      if (alertHideTimeout) clearTimeout(alertHideTimeout);
+
+      const master = CATALOG.masterStyles[CONFIG.masterStyleId] || CATALOG.masterStyles[0];
+      const style = CATALOG.alertStyles[CONFIG.alertStyleId] || CATALOG.alertStyles[0];
+      const fx = data.fx || pickAlertInOutEffect(false);
+
+      const isKick = data.platform === "kick";
+      const platformColor = isKick ? "#53FC18" : "#9146FF";
+      const platformName = isKick ? "KICK" : "TWITCH";
+      const platformIcon = isKick
+        ? `<span class="font-black text-black bg-[#53FC18] px-1.5 py-0.5 rounded text-[10px] leading-none">K</span>`
+        : `<i class="fa-brands fa-twitch text-white bg-[#9146FF] p-1 rounded text-[10px]"></i>`;
+
+      const flexDir = master.dir === "col" ? "flex-col items-center text-center" : (master.dir === "row-reverse" ? "flex-row-reverse text-right" : "flex-row text-left");
+
+      slot.innerHTML = `
+        <div id="liveAlertCard" class="relative overflow-hidden ${master.radius} ${master.pad} ${master.font} transition-all"
+             style="
+               background: linear-gradient(135deg, ${style.bg1} 0%, ${style.bg2} 100%);
+               border: ${style.borderStyle} ${style.accent};
+               box-shadow: 0 14px 35px -5px ${style.glow}, inset 0 1px 0 rgba(255,255,255,0.15);
+               color: ${style.text};
+               transform: ${fx.inTx};
+               opacity: 0;
+               filter: blur(${fx.blur});
+               transition: transform ${fx.dur}ms ${fx.ease}, opacity ${fx.dur}ms ease, filter ${fx.dur}ms ease;
+             ">
+          ${style.topBar ? `<div class="absolute top-0 left-0 right-0 h-1.5" style="background: linear-gradient(90deg, ${platformColor}, ${style.accent}, ${platformColor});"></div>` : ''}
+          ${style.scanline ? `<div class="absolute inset-0 pointer-events-none opacity-15" style="background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.18) 3px);"></div>` : ''}
+
+          <!-- Header Row: Reward Title on Top & Description Under Title -->
+          <div class="flex ${flexDir} gap-3.5 items-center relative z-10">
+            
+            <!-- User Twitch/Kick Profile Picture -->
+            <div class="relative shrink-0">
+              <img src="${escapeHtml(data.avatar)}"
+                   onerror="this.src='https://placehold.co/120x120/1e293b/ffffff?text=USER'"
+                   alt="${escapeHtml(data.user)}"
+                   class="${master.avatarSize} ${master.avatarClip} ${master.avatarRing} object-cover shadow-lg"
+                   style="border: 2px solid ${style.accent};" />
+              <div class="absolute -bottom-1 -right-1 shadow-md">
+                ${platformIcon}
+              </div>
+            </div>
+
+            <!-- Reward Title on Top + Description Under Title + User Name -->
+            <div class="flex-1 min-w-0">
+              <!-- Top Badge Row -->
+              <div class="flex items-center gap-1.5 flex-wrap ${master.dir === 'col' ? 'justify-center' : (master.dir === 'row-reverse' ? 'justify-end' : 'justify-start')} mb-1">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      style="background: ${style.accent}25; color: ${style.accent}; border: 1px solid ${style.accent}60;">
+                  ${platformName} REWARD
+                </span>
+                <span class="text-xs font-bold truncate" style="color: ${style.sub};">
+                  <i class="fa-solid fa-user-check text-[10px] mr-1 opacity-75"></i>${escapeHtml(data.user)}
+                </span>
+                ${data.timerInfo ? `
+                  <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-black/40 border border-white/15 text-emerald-300">
+                    <i class="fa-regular fa-clock mr-1"></i>${formatClockReadout(data.timerInfo.totalSeconds)}
+                  </span>
+                ` : ''}
+              </div>
+
+              <!-- REWARD TITLE ON TOP -->
+              <h3 class="text-base sm:text-lg font-black tracking-tight leading-snug break-words" style="color: ${style.text};">
+                ${escapeHtml(data.title)}
+              </h3>
+
+              <!-- REWARD DESCRIPTION UNDER THE TITLE -->
+              ${data.description ? `
+                <p class="text-xs sm:text-[13px] mt-1 leading-relaxed break-words opacity-95" style="color: ${style.sub};">
+                  ${escapeHtml(data.description)}
+                </p>
+              ` : ''}
+            </div>
+
+          </div>
+
+          ${CONFIG.showAlertHoldBar ? `
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-black/40 overflow-hidden">
+              <div id="liveAlertHoldBar" class="h-full w-full" style="background: ${style.accent}; transform-origin: left center; transform: scaleX(1);"></div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      const holdSeconds = Math.max(0.5, Number(CONFIG.alertHoldSec) || 6);
+      const holdMs = holdSeconds * 1000;
+
+      // Trigger Entry Animation + Disappear Countdown Bar
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const card = document.getElementById("liveAlertCard");
+          if (card) {
+            card.style.transform = "translate(0, 0) scale(1) rotate(0deg) skew(0deg)";
+            card.style.opacity = "1";
+            card.style.filter = "blur(0px)";
+          }
+          const holdBar = document.getElementById("liveAlertHoldBar");
+          if (holdBar) {
+            holdBar.style.transition = `transform ${holdMs}ms linear`;
+            holdBar.style.transform = "scaleX(0)";
+          }
+        });
+      });
+
+      // Schedule Exit Animation using the same chosen effect after custom seconds
+      alertHideTimeout = setTimeout(() => {
+        const card = document.getElementById("liveAlertCard");
+        if (card) {
+          card.style.transform = fx.outTx;
+          card.style.opacity = "0";
+          card.style.filter = `blur(${fx.blur})`;
+          setTimeout(() => {
+            if (slot) slot.innerHTML = "";
+          }, fx.dur + 50);
+        }
+      }, holdMs);
+    }
+
+    /*************************************************************************
+     * 6. ACTIVE COUNTDOWN TIMER STACK ENGINE
+     * Displays timer, reward name, and user name + avatar who triggered it.
+     * Moves newest/active timed reward to the top if another reward is active!
+     * Supports independent Random In/Out effect per Timer!
+     *************************************************************************/
+    function addOrPromoteActiveTimer(timerObj) {
+      if (CONFIG.moveNewestToTop) {
+        // Place newest timed reward at index 0 (the top of the stack)
+        activeTimers.unshift(timerObj);
+      } else {
+        activeTimers.push(timerObj);
+      }
+
+      renderActiveTimersStack(timerObj.id);
+      ensureTimerLoopRunning();
+      updateActiveTimerCounterUI();
+    }
+
+    function ensureTimerLoopRunning() {
+      if (timerInterval) return;
+      timerInterval = setInterval(() => {
+        if (activeTimers.length === 0) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+          updateActiveTimerCounterUI();
+          return;
+        }
+
+        const finishedTimers = [];
+        activeTimers.forEach(t => {
+          if (t.completing) return;
+          t.remainingSec = Math.max(0, t.remainingSec - 1);
+          updateSingleTimerDOM(t);
+          if (t.remainingSec <= 0) {
+            t.completing = true;
+            finishedTimers.push(t);
+          }
+        });
+
+        if (finishedTimers.length > 0) {
+          finishedTimers.forEach(fin => {
+            onTimerCompleted(fin);
+          });
+        }
+      }, 1000);
+    }
+
+    function onTimerCompleted(timerItem) {
+      // 1. Play 100+ Timer Completion Sound
+      playTimerEndSound();
+
+      // 2. Send Chat Message to the platform that the reward was active on:
+      // "Channel Reward Name Is Over After 5 Mins"
+      const endChatMsg = formatChatTemplate(CONFIG.endChatTemplate, {
+        user: timerItem.user,
+        reward: timerItem.title,
+        description: timerItem.description,
+        duration: timerItem.durationLabel
+      });
+
+      const shouldSendLiveToSb = !timerItem.isStudioTest || CONFIG.sendChatOnTests;
+      sendPlatformChatMessage({
+        platform: timerItem.platform,
+        messageText: endChatMsg,
+        eventPhase: "end",
+        redemptionId: timerItem.redemptionId || timerItem.id,
+        extraVars: {
+          user: timerItem.user,
+          reward: timerItem.title,
+          description: timerItem.description,
+          duration: timerItem.durationLabel
+        },
+        sendToStreamerBot: shouldSendLiveToSb
+      });
+
+      // 3. Animate out using this timer's assigned In/Out effect (or a new random exit if randomEffectOnTimer is enabled)
+      const el = document.getElementById(`timer-card-${timerItem.id}`);
+      const fxIdx = CONFIG.randomEffectOnTimer
+        ? (typeof timerItem.fxId === "number" ? timerItem.fxId : Math.floor(Math.random() * CATALOG.inOutEffects.length))
+        : CONFIG.inOutFxId;
+      const fx = CATALOG.inOutEffects[fxIdx] || CATALOG.inOutEffects[0];
+
+      if (el) {
+        el.style.transition = `transform ${fx.dur}ms ${fx.ease}, opacity ${fx.dur}ms ease, filter ${fx.dur}ms ease`;
+        el.style.transform = fx.outTx;
+        el.style.opacity = "0";
+        el.style.filter = `blur(${fx.blur})`;
+      }
+
+      setTimeout(() => {
+        activeTimers = activeTimers.filter(t => t.id !== timerItem.id);
+        renderActiveTimersStack();
+        updateActiveTimerCounterUI();
+      }, (fx.dur || 400) + 40);
+    }
+
+    function renderActiveTimersStack(newlyAddedId = null) {
+      const container = document.getElementById("activeTimersStack");
+      if (!container) return;
+
+      // Ensure ordering: if moveNewestToTop is checked, sort by updatedAt desc
+      if (CONFIG.moveNewestToTop) {
+        activeTimers.sort((a, b) => b.updatedAt - a.updatedAt);
+      }
+
+      const master = CATALOG.masterStyles[CONFIG.masterStyleId] || CATALOG.masterStyles[0];
+      const tStyle = CATALOG.timerStyles[CONFIG.timerStyleId] || CATALOG.timerStyles[0];
+
+      container.innerHTML = activeTimers.map((t, index) => {
+        const pct = Math.max(0, Math.min(100, (t.remainingSec / t.totalSec) * 100));
+        const clockStr = formatClockReadout(t.remainingSec);
+        const isKick = t.platform === "kick";
+        const platBadge = isKick
+          ? `<span class="px-1.5 py-0.5 rounded bg-[#53FC18] text-black font-black text-[9px]">KICK</span>`
+          : `<span class="px-1.5 py-0.5 rounded bg-[#9146FF] text-white font-bold text-[9px]">TWITCH</span>`;
+
+        const isTopPinned = index === 0 && activeTimers.length > 1;
+        const fx = CATALOG.inOutEffects[typeof t.fxId === "number" ? t.fxId : CONFIG.inOutFxId] || CATALOG.inOutEffects[0];
+        const entryStyle = (t.id === newlyAddedId)
+          ? `transform: ${fx.inTx}; opacity: 0; filter: blur(${fx.blur}); transition: transform ${fx.dur}ms ${fx.ease}, opacity ${fx.dur}ms ease, filter ${fx.dur}ms ease;`
+          : `transform: translate(0,0) scale(1); opacity: 1; filter: blur(0px);`;
+
+        // Render specialized visual layout based on the 9 Timer Archetypes
+        if (tStyle.archetype === "circular-ring") {
+          const dashOffset = 125.6 - (125.6 * pct) / 100;
+          return `
+            <div id="timer-card-${t.id}" class="timer-stack-item relative overflow-hidden ${master.radius} p-3 ${master.font}"
+                 style="background: linear-gradient(135deg, ${tStyle.bg1}f2, ${tStyle.bg2}f2); border: 1.5px solid ${tStyle.accent}; box-shadow: 0 8px 24px ${tStyle.glow}; color: ${tStyle.text}; ${entryStyle}">
+              <div class="flex items-center gap-3">
+                <div class="relative w-12 h-12 flex items-center justify-center shrink-0">
+                  <svg class="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
+                    <circle cx="24" cy="24" r="20" stroke="rgba(255,255,255,0.15)" stroke-width="4" fill="none" />
+                    <circle id="timer-ring-${t.id}" cx="24" cy="24" r="20" stroke="${tStyle.accent}" stroke-width="4" fill="none"
+                            stroke-dasharray="125.6" stroke-dashoffset="${dashOffset}" stroke-linecap="round" />
+                  </svg>
+                  <img src="${escapeHtml(t.avatar)}" class="w-8 h-8 rounded-full object-cover absolute" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    ${platBadge}
+                    <span class="text-xs font-bold truncate" style="color:${tStyle.sub};">${escapeHtml(t.user)}</span>
+                    ${isTopPinned ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 font-mono">ACTIVE TOP</span>` : ''}
+                  </div>
+                  <div class="text-sm font-extrabold truncate">${escapeHtml(t.title)}</div>
+                </div>
+                <div id="timer-clock-${t.id}" class="font-mono-tech text-lg font-black px-2.5 py-1 rounded-lg bg-black/40 border border-white/10" style="color:${tStyle.accent};">
+                  ${clockStr}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        if (tStyle.archetype === "compact-pill") {
+          return `
+            <div id="timer-card-${t.id}" class="timer-stack-item relative overflow-hidden rounded-full px-4 py-2.5 ${master.font}"
+                 style="background: linear-gradient(90deg, ${tStyle.bg1}, ${tStyle.bg2}); border: 2px solid ${tStyle.accent}; box-shadow: 0 6px 20px ${tStyle.glow}; color: ${tStyle.text}; ${entryStyle}">
+              <div class="flex items-center justify-between gap-3 relative z-10">
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <img src="${escapeHtml(t.avatar)}" class="w-8 h-8 rounded-full object-cover border border-white/30 shrink-0" />
+                  <div class="min-w-0">
+                    <div class="text-xs font-extrabold truncate">${escapeHtml(t.title)}</div>
+                    <div class="text-[10px] truncate" style="color:${tStyle.sub};">${escapeHtml(t.user)}</div>
+                  </div>
+                </div>
+                <div id="timer-clock-${t.id}" class="font-mono-tech text-base font-black px-3 py-0.5 rounded-full bg-black/50" style="color:${tStyle.accent};">
+                  ${clockStr}
+                </div>
+              </div>
+              <div id="timer-bar-${t.id}" class="absolute bottom-0 left-0 h-1 transition-all duration-500" style="width:${pct}%; background:${tStyle.accent};"></div>
+            </div>
+          `;
+        }
+
+        // Default Rich Progress Bar / LED / Tactical / Holo Card
+        const isSegmented = tStyle.archetype === "segmented-led";
+        return `
+          <div id="timer-card-${t.id}" class="timer-stack-item relative overflow-hidden ${master.radius} p-3.5 ${master.font}"
+               style="background: linear-gradient(135deg, ${tStyle.bg1}f5, ${tStyle.bg2}f5); border: 1.5px solid ${tStyle.accent}; box-shadow: 0 8px 25px ${tStyle.glow}; color: ${tStyle.text}; ${entryStyle}">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <img src="${escapeHtml(t.avatar)}"
+                     onerror="this.src='https://placehold.co/80x80/1e293b/ffffff?text=U'"
+                     class="w-10 h-10 ${master.avatarClip} object-cover shrink-0"
+                     style="border: 1.5px solid ${tStyle.accent};" />
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    ${platBadge}
+                    <span class="text-[11px] font-bold truncate" style="color:${tStyle.sub};">${escapeHtml(t.user)}</span>
+                    ${isTopPinned ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-emerald-400/20 text-emerald-300 border border-emerald-400/40 font-mono">TOP ACTIVE</span>` : ''}
+                  </div>
+                  <div class="text-xs sm:text-sm font-extrabold truncate mt-0.5" style="color:${tStyle.text};">
+                    ${escapeHtml(t.title)}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Countdown Clock Readout -->
+              <div class="shrink-0 text-right">
+                <div id="timer-clock-${t.id}" class="font-mono-tech text-base sm:text-lg font-black px-2.5 py-1 rounded-lg bg-black/45 border border-white/10 tracking-wider" style="color:${tStyle.accent};">
+                  ${clockStr}
+                </div>
+              </div>
+            </div>
+
+            <!-- Progress Bar Under Timer -->
+            <div class="w-full h-2 bg-black/50 rounded-full overflow-hidden mt-2.5 p-0.5 border border-white/10">
+              <div id="timer-bar-${t.id}" class="h-full rounded-full transition-all duration-500"
+                   style="width: ${pct}%; background: ${isSegmented ? `repeating-linear-gradient(90deg, ${tStyle.accent}, ${tStyle.accent} 6px, transparent 6px, transparent 9px)` : `linear-gradient(90deg, ${tStyle.accent}, #ffffff)`};"></div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      if (newlyAddedId) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const newEl = document.getElementById(`timer-card-${newlyAddedId}`);
+            if (newEl) {
+              newEl.style.transform = "translate(0,0) scale(1) rotate(0deg) skew(0deg)";
+              newEl.style.opacity = "1";
+              newEl.style.filter = "blur(0px)";
+            }
+          });
+        });
+      }
+    }
+
+    function updateSingleTimerDOM(t) {
+      const clockEl = document.getElementById(`timer-clock-${t.id}`);
+      if (clockEl) clockEl.textContent = formatClockReadout(t.remainingSec);
+
+      const pct = Math.max(0, Math.min(100, (t.remainingSec / t.totalSec) * 100));
+      const barEl = document.getElementById(`timer-bar-${t.id}`);
+      if (barEl) barEl.style.width = `${pct}%`;
+
+      const ringEl = document.getElementById(`timer-ring-${t.id}`);
+      if (ringEl) {
+        const dashOffset = 125.6 - (125.6 * pct) / 100;
+        ringEl.setAttribute("stroke-dashoffset", String(dashOffset));
+      }
+    }
+
+    function updateActiveTimerCounterUI() {
+      const el = document.getElementById("activeTimerCounter");
+      if (el) el.textContent = `${activeTimers.length} Active ${activeTimers.length === 1 ? 'Timer' : 'Timers'}`;
+    }
+
+    /*************************************************************************
+     * 7. PLATFORM CHAT MESSAGE DISPATCHER (TWITCH & KICK)
+     * Uses Separate Streamer.bot Action Names/IDs for:
+     * - Twitch Redeemed Action & Twitch Timer Finished Action
+     * - Kick Redeemed Action & Kick Timer Finished Action
+     * And passes the formatted message as the configured Action Arg!
+     *************************************************************************/
+    function formatChatTemplate(template, vars) {
+      return (template || "")
+        .replace(/\{user\}/gi, vars.user || "")
+        .replace(/\{reward\}/gi, vars.reward || "")
+        .replace(/\{description\}/gi, vars.description || "")
+        .replace(/\{duration\}/gi, vars.duration || "");
+    }
+
+    function getTargetActionForPlatformAndStage(platform, stageKey) {
+      const isKick = (platform || "twitch").toLowerCase() === "kick";
+      const isEnd = (stageKey || "start").toLowerCase() === "end";
+
+      if (isKick) {
+        return isEnd
+          ? { name: CONFIG.kickEndActionName, id: CONFIG.kickEndActionId }
+          : { name: CONFIG.kickStartActionName, id: CONFIG.kickStartActionId };
+      } else {
+        return isEnd
+          ? { name: CONFIG.twitchEndActionName, id: CONFIG.twitchEndActionId }
+          : { name: CONFIG.twitchStartActionName, id: CONFIG.twitchStartActionId };
+      }
+    }
+
+    function sendPlatformChatMessage({ platform, messageText, eventPhase, redemptionId, extraVars = {}, sendToStreamerBot = true }) {
+      const stageKey = (eventPhase || "start").toLowerCase();
+      const isEnd = stageKey === "end";
+      const dedupeKey = `${redemptionId || "msg"}:${stageKey}`;
+      const targetAction = getTargetActionForPlatformAndStage(platform, stageKey);
+      const customArgKey = isEnd
+        ? (CONFIG.endArgName || "timerMessage").trim()
+        : (CONFIG.startArgName || "rewardMessage").trim();
+
+      // 1. Always show in the Studio Simulated Chat Feed with Action & Arg info
+      let transportLabel = `Preview (${customArgKey})`;
+      if (sendToStreamerBot && wsClient && wsClient.readyState === WebSocket.OPEN && targetAction.name) {
+        transportLabel = `Action: ${targetAction.name} [${customArgKey}]`;
+      }
+      appendSimulatedChatMessage(platform, messageText, stageKey.toUpperCase(), transportLabel);
+
+      if (!sendToStreamerBot) return;
+      if (!targetAction.name) return;
+      if (redemptionId && sentChatDedupeSet.has(dedupeKey)) return;
+      if (redemptionId) sentChatDedupeSet.add(dedupeKey);
+
+      // 2. Dispatch via Streamer.bot WebSocket DoAction to the specific platform + phase Action
+      if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+        const actionObj = { name: targetAction.name };
+        if (targetAction.id) {
+          actionObj.id = targetAction.id;
+        }
+
+        // Build args object with user's configured arg name + standard fallbacks
+        const argsPayload = {
+          [customArgKey]: messageText,
+          rewardMessage: messageText,
+          timerMessage: messageText,
+          chatMessage: messageText,
+          message: messageText,
+          rawInput: messageText,
+          platform: platform || "twitch",
+          eventPhase: stageKey,
+          user: extraVars.user || "",
+          reward: extraVars.reward || "",
+          description: extraVars.description || "",
+          duration: extraVars.duration || "",
+          redemptionId: redemptionId || ("req_" + Date.now())
+        };
+
+        const doActionPayload = {
+          request: "DoAction",
+          action: actionObj,
+          args: argsPayload,
+          id: "chat-req-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6)
+        };
+
+        try {
+          wsClient.send(JSON.stringify(doActionPayload));
+        } catch (e) {
+          console.warn("Failed to send DoAction to Streamer.bot:", e);
+        }
+      }
+    }
+
+    function sendLiveTestChatMessage(platform, stage = "start") {
+      updateConfigFromUI();
+      const isEnd = stage === "end";
+      const testId = "manual_test_" + Date.now();
+      const sampleVars = {
+        user: platform === "kick" ? "KickLegend99" : "ShroudTTV",
+        reward: "No HUD Challenge",
+        description: "Turn off the game HUD for 5 minutes! (5:00)",
+        duration: "5 Mins"
+      };
+
+      const msg = isEnd
+        ? formatChatTemplate(CONFIG.endChatTemplate, sampleVars)
+        : formatChatTemplate(CONFIG.startChatTemplate, sampleVars);
+
+      const targetAction = getTargetActionForPlatformAndStage(platform, stage);
+      const argName = isEnd ? CONFIG.endArgName : CONFIG.startArgName;
+
+      sendPlatformChatMessage({
+        platform,
+        messageText: msg,
+        eventPhase: stage,
+        redemptionId: testId,
+        extraVars: sampleVars,
+        sendToStreamerBot: true
+      });
+
+      if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+        showToast(`Sent DoAction '${targetAction.name}' with arg %${argName}% to Streamer.bot!`);
+      } else {
+        showToast(`Logged preview for '${targetAction.name}' (arg %${argName}%). Connect WS to trigger in Streamer.bot!`);
+      }
+    }
+
+    function appendSimulatedChatMessage(platform, messageText, eventPhase, transportLabel = "Preview") {
+      const list = document.getElementById("chatMessagesList");
+      if (!list) return;
+
+      if (chatMessageCount === 0) list.innerHTML = "";
+      chatMessageCount++;
+
+      const badge = document.getElementById("chatCountBadge");
+      if (badge) badge.textContent = String(chatMessageCount);
+
+      const isKick = platform === "kick";
+      const platTag = isKick
+        ? `<span class="px-1.5 py-0.5 rounded bg-[#53FC18] text-black font-black text-[10px]">KICK</span>`
+        : `<span class="px-1.5 py-0.5 rounded bg-[#9146FF] text-white font-bold text-[10px]">TWITCH</span>`;
+
+      const phaseBadge = eventPhase === "END"
+        ? `<span class="text-[10px] text-amber-300 font-mono">[TIMER OVER]</span>`
+        : `<span class="text-[10px] text-emerald-300 font-mono">[REDEEMED]</span>`;
+
+      const item = document.createElement("div");
+      item.className = "p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/90 space-y-1 animate-fadeIn";
+      item.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            ${platTag}
+            <span class="font-bold text-slate-200 text-[11px]">StreamerBot</span>
+            ${phaseBadge}
+          </div>
+          <span class="text-[9px] text-indigo-300 font-mono px-1.5 py-0.2 bg-indigo-500/15 rounded">${escapeHtml(transportLabel)}</span>
+        </div>
+        <div class="text-xs text-slate-100 leading-snug break-words font-medium">
+          ${escapeHtml(messageText)}
+        </div>
+      `;
+      list.prepend(item);
+    }
+
+    function clearChatLog() {
+      const list = document.getElementById("chatMessagesList");
+      if (list) list.innerHTML = `<div class="text-[11px] text-slate-400 italic">Chat log cleared.</div>`;
+      chatMessageCount = 0;
+      const badge = document.getElementById("chatCountBadge");
+      if (badge) badge.textContent = "0";
+    }
+
+    function toggleChatDrawer() {
+      const panel = document.getElementById("simulatedChatPanel");
+      if (panel) panel.classList.toggle("hidden");
+    }
+
+    /*************************************************************************
+     * 8. REAL STREAMER.BOT WEBSOCKET CLIENT (WITH AUTOMATIC GetActions DISCOVERY)
+     *************************************************************************/
+    function connectWebSocket(manual = false) {
+      const urlInput = document.getElementById("cfgWsUrl");
+      if (urlInput) CONFIG.wsUrl = urlInput.value.trim() || "ws://127.0.0.1:8080/";
+
+      if (wsClient) {
+        try { wsClient.close(); } catch (e) {}
+      }
+
+      updateWsStatusUI("connecting", `Connecting to ${CONFIG.wsUrl}...`);
+
+      try {
+        wsClient = new WebSocket(CONFIG.wsUrl);
+
+        wsClient.onopen = () => {
+          updateWsStatusUI("connected", `Connected (${CONFIG.wsUrl})`);
+          if (manual) showToast("Connected to Streamer.bot WebSocket!");
+
+          // 1. Subscribe to Twitch Reward Redemption, Kick Reward Redemption, and Custom C# Broadcast
+          const subMsg = {
+            request: "Subscribe",
+            id: "sb_reward_studio_sub",
+            events: {
+              Twitch: ["RewardRedemption"],
+              Kick: ["RewardRedemption"],
+              General: ["Custom"]
+            }
+          };
+          wsClient.send(JSON.stringify(subMsg));
+
+          // 2. Immediately query GetActions so we resolve the exact Action ID & Name for DoAction chat!
+          requestStreamerBotActions();
+        };
+
+        wsClient.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            handleStreamerBotWsMessage(msg);
+          } catch (err) {
+            console.warn("WS message parse error:", err);
+          }
+        };
+
+        wsClient.onerror = () => {
+          updateWsStatusUI("standby", `WS: Standby (${CONFIG.wsUrl})`);
+        };
+
+        wsClient.onclose = () => {
+          updateWsStatusUI("standby", `WS: Standby (${CONFIG.wsUrl})`);
+        };
+      } catch (err) {
+        updateWsStatusUI("standby", "WS: Connection Failed");
+      }
+    }
+
+    function requestStreamerBotActions(manualToast = false) {
+      if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+        wsClient.send(JSON.stringify({
+          request: "GetActions",
+          id: "fetch-actions"
+        }));
+        if (manualToast) showToast("Requested Actions list from Streamer.bot...");
+      } else if (manualToast) {
+        showToast("Connect to Streamer.bot WebSocket first to load your Actions list!");
+      }
+    }
+
+    function populateActionDropdownsFromDetectedList() {
+      const dropdownConfigs = [
+        { selectId: "selectTwitchStartAction", nameKey: "twitchStartActionName", idKey: "twitchStartActionId" },
+        { selectId: "selectTwitchEndAction",   nameKey: "twitchEndActionName",   idKey: "twitchEndActionId" },
+        { selectId: "selectKickStartAction",   nameKey: "kickStartActionName",   idKey: "kickStartActionId" },
+        { selectId: "selectKickEndAction",     nameKey: "kickEndActionName",     idKey: "kickEndActionId" }
+      ];
+
+      let resolvedCount = 0;
+
+      dropdownConfigs.forEach(slot => {
+        const sel = document.getElementById(slot.selectId);
+        const currentName = (CONFIG[slot.nameKey] || "").trim();
+        const matchedAction = detectedSbActions.find(
+          a => (a.name || "").toLowerCase() === currentName.toLowerCase()
+        );
+
+        if (matchedAction) {
+          CONFIG[slot.idKey] = matchedAction.id || "";
+          CONFIG[slot.nameKey] = matchedAction.name || currentName;
+          resolvedCount++;
+        } else {
+          CONFIG[slot.idKey] = "";
+        }
+
+        if (sel) {
+          if (detectedSbActions.length === 0) {
+            sel.innerHTML = `<option value="">-- Connect to Streamer.bot to list Actions --</option>`;
+          } else {
+            sel.innerHTML =
+              `<option value="">-- Select from ${detectedSbActions.length} Streamer.bot Actions --</option>` +
+              detectedSbActions
+                .map(a => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)}</option>`)
+                .join("");
+            if (matchedAction) {
+              sel.value = matchedAction.id;
+            }
+          }
+        }
+      });
+
+      const badge = document.getElementById("resolvedActionBadge");
+      if (badge) {
+        if (detectedSbActions.length === 0) {
+          badge.textContent = "Actions: Manual Names";
+          badge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30";
+        } else {
+          badge.textContent = `${detectedSbActions.length} Actions Loaded (${resolvedCount}/4 Linked)`;
+          badge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
+        }
+      }
+    }
+
+    function onSelectActionDropdown(slotKey, actionId) {
+      const found = detectedSbActions.find(a => a.id === actionId);
+      if (!found) return;
+
+      const map = {
+        twitchStart: { nameKey: "twitchStartActionName", idKey: "twitchStartActionId", inputId: "cfgTwitchStartActionName" },
+        twitchEnd:   { nameKey: "twitchEndActionName",   idKey: "twitchEndActionId",   inputId: "cfgTwitchEndActionName" },
+        kickStart:   { nameKey: "kickStartActionName",   idKey: "kickStartActionId",   inputId: "cfgKickStartActionName" },
+        kickEnd:     { nameKey: "kickEndActionName",     idKey: "kickEndActionId",     inputId: "cfgKickEndActionName" }
+      };
+
+      const target = map[slotKey];
+      if (!target) return;
+
+      CONFIG[target.nameKey] = found.name;
+      CONFIG[target.idKey] = found.id;
+
+      const inputEl = document.getElementById(target.inputId);
+      if (inputEl) inputEl.value = found.name;
+
+      populateActionDropdownsFromDetectedList();
+      showToast(`Selected Action: ${found.name}`);
+    }
+
+    function onManualActionNameInput(slotKey, rawValue) {
+      const map = {
+        twitchStart: { nameKey: "twitchStartActionName", idKey: "twitchStartActionId" },
+        twitchEnd:   { nameKey: "twitchEndActionName",   idKey: "twitchEndActionId" },
+        kickStart:   { nameKey: "kickStartActionName",   idKey: "kickStartActionId" },
+        kickEnd:     { nameKey: "kickEndActionName",     idKey: "kickEndActionId" }
+      };
+      const target = map[slotKey];
+      if (!target) return;
+
+      CONFIG[target.nameKey] = (rawValue || "").trim();
+      populateActionDropdownsFromDetectedList();
+    }
+
+    function handleStreamerBotWsMessage(msg) {
+      // 1. Handle GetActions Response from Streamer.bot
+      if (msg.id === "fetch-actions" || Array.isArray(msg.actions)) {
+        detectedSbActions = Array.isArray(msg.actions) ? msg.actions : [];
+        populateActionDropdownsFromDetectedList();
+        return;
+      }
+
+      if (!msg.event || !msg.data) return;
+      const source = (msg.event.source || "").toLowerCase();
+      const type = (msg.event.type || "").toLowerCase();
+      const d = msg.data;
+
+      // 2. Custom C# Broadcast Payload from our Streamer.bot C# Script (RewardStudio_Handler)
+      const customPayload = (d.overlayType === "channelRewardAlert" || d.eventName === "RewardStudio.Redemption")
+        ? d
+        : ((d.data && (d.data.overlayType === "channelRewardAlert" || d.data.eventName === "RewardStudio.Redemption")) ? d.data : null);
+
+      if (customPayload) {
+        triggerRewardEvent({
+          redemptionId: customPayload.redemptionId || ("cs_" + Date.now()),
+          platform: customPayload.platform || "twitch",
+          user: customPayload.user || customPayload.userName || "Viewer",
+          userLogin: customPayload.userLogin || customPayload.user || "",
+          avatar: customPayload.avatar || "",
+          title: customPayload.title || customPayload.rewardTitle || "Channel Reward",
+          description: customPayload.description !== undefined ? customPayload.description : (customPayload.rewardPrompt || ""),
+          durationSeconds: Number(customPayload.durationSeconds) || 0,
+          humanDuration: customPayload.humanDuration || "",
+          startChatSent: !!customPayload.startChatSent,
+          isStudioTest: false
+        });
+        return;
+      }
+
+      // 3. Native Twitch or Kick RewardRedemption Event directly from Streamer.bot WebSocket
+      if (type === "rewardredemption") {
+        const redemptionObj = d.redemption || d;
+        const rewardObj = redemptionObj.reward || d.reward || {};
+        const userObj = redemptionObj.user || d.user || {};
+
+        const platform = source.includes("kick") ? "kick" : "twitch";
+        const user = redemptionObj.user_name || d.user_name || userObj.display_name || userObj.name || userObj.username || d.userName || "Viewer";
+        const userLogin = redemptionObj.user_login || d.user_login || userObj.login || userObj.username || user;
+        const avatar = d.user_avatar || userObj.profile_image_url || userObj.avatar || d.targetUserProfileImageUrl || "";
+
+        const title = rewardObj.title || d.reward_title || d.rewardName || d.title || "Channel Reward";
+
+        // Inspect all possible description & user_input fields so (5:00) or (1:00:00) is always found
+        const promptParts = [];
+        const rawPrompt = rewardObj.prompt || rewardObj.description || d.prompt || d.rewardPrompt || d.reward_prompt || "";
+        const userInput = redemptionObj.user_input || d.user_input || d.rawInput || d.userInput || d.message || "";
+        if (rawPrompt) promptParts.push(rawPrompt);
+        if (userInput && userInput !== rawPrompt) promptParts.push(userInput);
+        const fullDescription = promptParts.join(" - ");
+
+        const redemptionId = redemptionObj.id || d.id || d.redemptionId || ("native_" + Date.now());
+
+        triggerRewardEvent({
+          redemptionId,
+          platform,
+          user,
+          userLogin,
+          avatar,
+          title,
+          description: fullDescription,
+          startChatSent: false,
+          isStudioTest: false
+        });
+      }
+    }
+
+    function updateWsStatusUI(state, text) {
+      const dot = document.getElementById("wsDot");
+      const label = document.getElementById("wsStatusText");
+      if (!dot || !label) return;
+      label.textContent = text;
+      dot.className = "w-2.5 h-2.5 rounded-full ";
+      if (state === "connected") {
+        dot.className += "bg-emerald-400 shadow-[0_0_8px_#34d399]";
+      } else if (state === "connecting") {
+        dot.className += "bg-cyan-400 animate-ping";
+      } else {
+        dot.className += "bg-amber-400 animate-pulse";
+      }
+    }
+
+    /*************************************************************************
+     * 9. 9-ZONE SCREEN POSITIONING & UI CONTROLS
+     *************************************************************************/
+    const POSITION_FLEX_MAP = {
+      "top-left": "justify-start items-start",
+      "top-center": "justify-start items-center",
+      "top-right": "justify-start items-end",
+      "middle-left": "justify-center items-start",
+      "center": "justify-center items-center",
+      "middle-right": "justify-center items-end",
+      "bottom-left": "justify-end items-start",
+      "bottom-center": "justify-end items-center",
+      "bottom-right": "justify-end items-end"
+    };
+
+    function setScreenPosition(posKey) {
+      CONFIG.position = posKey;
+      const root = document.getElementById("overlayRoot");
+      if (root) {
+        root.className = `absolute inset-0 pointer-events-none p-6 flex flex-col transition-all duration-300 ${POSITION_FLEX_MAP[posKey] || POSITION_FLEX_MAP['bottom-right']}`;
+      }
+
+      const anchor = document.getElementById("overlayAnchor");
+      if (anchor) {
+        const origins = {
+          "top-left": "top left",
+          "top-center": "top center",
+          "top-right": "top right",
+          "middle-left": "center left",
+          "center": "center center",
+          "middle-right": "center right",
+          "bottom-left": "bottom left",
+          "bottom-center": "bottom center",
+          "bottom-right": "bottom right"
+        };
+        anchor.style.transformOrigin = origins[posKey] || "bottom right";
+      }
+
+      document.getElementById("posLabelBadge").textContent = posKey.replace("-", " ").replace(/\b\w/g, c => c.toUpperCase());
+      document.getElementById("stagePosWatermark").textContent = posKey;
+
+      document.querySelectorAll(".pos-btn").forEach(btn => {
+        const isMatch = btn.getAttribute("data-pos") === posKey;
+        btn.className = `pos-btn h-12 rounded-lg border flex p-2 transition ${
+          isMatch ? "border-indigo-500 bg-indigo-600/20 text-indigo-200 font-bold" : "border-slate-800 bg-slate-900 hover:border-indigo-500/60 text-slate-400"
+        } ${btn.className.split(" ").filter(c => c.startsWith("items-") || c.startsWith("justify-")).join(" ")}`;
+      });
+    }
+
+    function setAlertHoldSeconds(rawVal, showToastPreview = false) {
+      const parsed = parseFloat(rawVal);
+      const sec = (!isNaN(parsed) && parsed >= 0.5) ? Math.min(600, parsed) : 6;
+      CONFIG.alertHoldSec = sec;
+
+      const numInput = document.getElementById("cfgAlertHoldSec");
+      if (numInput && document.activeElement !== numInput) numInput.value = String(sec);
+
+      const numInputStyles = document.getElementById("cfgAlertHoldSecStyles");
+      if (numInputStyles && document.activeElement !== numInputStyles) numInputStyles.value = String(sec);
+
+      const slider = document.getElementById("cfgAlertHoldSlider");
+      if (slider && document.activeElement !== slider) slider.value = String(Math.min(60, Math.max(1, Math.round(sec))));
+
+      const badge = document.getElementById("alertHoldBadge");
+      if (badge) badge.textContent = `${sec}s`;
+
+      updatePresetBadges();
+
+      if (showToastPreview) {
+        previewCurrentAlertStyle();
+        showToast(`Alert display duration set to ${sec} seconds before going away!`);
+      }
+    }
+
+    function updateConfigFromUI() {
+      CONFIG.moveNewestToTop = document.getElementById("cfgMoveNewestToTop").checked;
+      const rawHold = parseFloat(document.getElementById("cfgAlertHoldSec").value);
+      CONFIG.alertHoldSec = (!isNaN(rawHold) && rawHold >= 0.5) ? Math.min(600, rawHold) : 6;
+      const showBarEl = document.getElementById("cfgShowAlertHoldBar");
+      if (showBarEl) CONFIG.showAlertHoldBar = showBarEl.checked;
+
+      const badge = document.getElementById("alertHoldBadge");
+      if (badge) badge.textContent = `${CONFIG.alertHoldSec}s`;
+      const numInputStyles = document.getElementById("cfgAlertHoldSecStyles");
+      if (numInputStyles && document.activeElement !== numInputStyles) numInputStyles.value = String(CONFIG.alertHoldSec);
+      const slider = document.getElementById("cfgAlertHoldSlider");
+      if (slider && document.activeElement !== slider) slider.value = String(Math.min(60, Math.max(1, Math.round(CONFIG.alertHoldSec))));
+
+      CONFIG.overlayScale = Number(document.getElementById("cfgOverlayScale").value) || 100;
+      CONFIG.wsUrl = document.getElementById("cfgWsUrl").value.trim() || "ws://127.0.0.1:8080/";
+
+      CONFIG.twitchStartActionName = (document.getElementById("cfgTwitchStartActionName")?.value || "").trim();
+      CONFIG.twitchEndActionName = (document.getElementById("cfgTwitchEndActionName")?.value || "").trim();
+      CONFIG.kickStartActionName = (document.getElementById("cfgKickStartActionName")?.value || "").trim();
+      CONFIG.kickEndActionName = (document.getElementById("cfgKickEndActionName")?.value || "").trim();
+
+      CONFIG.startArgName = (document.getElementById("cfgStartArgName")?.value || "rewardMessage").trim() || "rewardMessage";
+      CONFIG.endArgName = (document.getElementById("cfgEndArgName")?.value || "timerMessage").trim() || "timerMessage";
+
+      const startBadge = document.getElementById("startArgPreviewBadge");
+      if (startBadge) startBadge.textContent = `%${CONFIG.startArgName}%`;
+      const endBadge = document.getElementById("endArgPreviewBadge");
+      if (endBadge) endBadge.textContent = `%${CONFIG.endArgName}%`;
+
+      CONFIG.sendChatOnTests = document.getElementById("cfgSendChatOnTests").checked;
+      CONFIG.startChatTemplate = document.getElementById("cfgStartChatTemplate").value;
+      CONFIG.endChatTemplate = document.getElementById("cfgEndChatTemplate").value;
+      CONFIG.customAlertAudioUrl = document.getElementById("cfgCustomAlertAudioUrl").value.trim();
+      CONFIG.customTimerAudioUrl = document.getElementById("cfgCustomTimerAudioUrl").value.trim();
+
+      const rndAlertEl = document.getElementById("cfgRandomEffectOnAlert");
+      const rndTimerEl = document.getElementById("cfgRandomEffectOnTimer");
+      if (rndAlertEl) CONFIG.randomEffectOnAlert = rndAlertEl.checked;
+      if (rndTimerEl) CONFIG.randomEffectOnTimer = rndTimerEl.checked;
+
+      const topToggle = document.getElementById("topRandomFxToggle");
+      if (topToggle) {
+        topToggle.checked = CONFIG.randomEffectOnAlert && CONFIG.randomEffectOnTimer;
+      }
+
+      const anchor = document.getElementById("overlayAnchor");
+      if (anchor) {
+        anchor.style.transform = `scale(${CONFIG.overlayScale / 100})`;
+      }
+      populateActionDropdownsFromDetectedList();
+      updatePresetBadges();
+      renderActiveTimersStack();
+    }
+
+    function toggleQuickRandomFx(enabled) {
+      CONFIG.randomEffectOnAlert = enabled;
+      CONFIG.randomEffectOnTimer = enabled;
+      const rndAlertEl = document.getElementById("cfgRandomEffectOnAlert");
+      const rndTimerEl = document.getElementById("cfgRandomEffectOnTimer");
+      if (rndAlertEl) rndAlertEl.checked = enabled;
+      if (rndTimerEl) rndTimerEl.checked = enabled;
+      updatePresetBadges();
+      showToast(enabled ? "🎲 Random In/Out Effects enabled on every Alert & Timer!" : "Locked to selected In/Out Effect.");
+    }
+
+    function enableRandomEffectsForBoth() {
+      toggleQuickRandomFx(true);
+      const topToggle = document.getElementById("topRandomFxToggle");
+      if (topToggle) topToggle.checked = true;
+    }
+
+    function updateVolumeUI(val) {
+      CONFIG.volume = Number(val) / 100;
+      document.getElementById("volLabel").textContent = `${val}%`;
+    }
+
+    /*************************************************************************
+     * 10. DROPDOWN SELECTORS & STEPPERS FOR ALL 108 PRESETS
+     *************************************************************************/
+    function populateAllDropdowns() {
+      fillSelect("selectMasterStyle", CATALOG.masterStyles);
+      fillSelect("selectAlertStyle", CATALOG.alertStyles);
+      fillSelect("selectTimerStyle", CATALOG.timerStyles);
+      fillInOutFxSelect(CATALOG.inOutEffects);
+      fillSelect("selectAlertSound", CATALOG.alertSounds);
+      fillSelect("selectTimerSound", CATALOG.timerSounds);
+      updatePresetBadges();
+    }
+
+    function fillSelect(selectId, items) {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      sel.innerHTML = items.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("");
+    }
+
+    function fillInOutFxSelect(items) {
+      const sel = document.getElementById("selectInOutFx");
+      if (!sel) return;
+      const randomHeaderOption = `<option value="RANDOM_BOTH">🎲 #000 - RANDOM ON EACH ALERT & TIMER (Auto-Cycle All 108 Effects)</option>`;
+      sel.innerHTML = randomHeaderOption + items.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("");
+      sel.value = (CONFIG.randomEffectOnAlert && CONFIG.randomEffectOnTimer) ? "RANDOM_BOTH" : String(CONFIG.inOutFxId);
+    }
+
+    function filterSelectOptions(selectId, query, catalogKey) {
+      const q = (query || "").toLowerCase().trim();
+      const items = CATALOG[catalogKey].filter(item => item.name.toLowerCase().includes(q));
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      if (catalogKey === "inOutEffects") {
+        fillInOutFxSelect(items);
+      } else {
+        sel.innerHTML = items.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("");
+      }
+      if (items.length > 0 && catalogKey !== "inOutEffects") {
+        onSelectPreset(catalogKey === "alertStyles" ? "alertStyle" : "timerStyle", items[0].id);
+      }
+    }
+
+    function onSelectPreset(type, val) {
+      if (type === "inOutFx" && val === "RANDOM_BOTH") {
+        enableRandomEffectsForBoth();
+        replaySelectedAnimation();
+        return;
+      }
+
+      const id = Number(val) || 0;
+      if (type === "masterStyle") {
+        CONFIG.masterStyleId = id;
+        document.getElementById("selectMasterStyle").value = String(id);
+      } else if (type === "alertStyle") {
+        CONFIG.alertStyleId = id;
+        document.getElementById("selectAlertStyle").value = String(id);
+      } else if (type === "timerStyle") {
+        CONFIG.timerStyleId = id;
+        document.getElementById("selectTimerStyle").value = String(id);
+      } else if (type === "inOutFx") {
+        CONFIG.inOutFxId = id;
+        document.getElementById("selectInOutFx").value = String(id);
+        // Preview this specific effect immediately
+        const specificFx = CATALOG.inOutEffects[id] || CATALOG.inOutEffects[0];
+        lastChosenAlertFxName = specificFx.name;
+        renderMainAlertPopup({
+          platform: simPlatform,
+          user: document.getElementById("simUser").value || "ValkyraeFan99",
+          avatar: document.getElementById("simAvatar").value,
+          title: document.getElementById("simTitle").value || "Invert Mouse Challenge",
+          description: document.getElementById("simDescription").value || "Invert mouse for 5 minutes! (5:00)",
+          timerInfo: { totalSeconds: 300 },
+          fx: specificFx
+        });
+      } else if (type === "alertSound") {
+        CONFIG.alertSoundId = id;
+        document.getElementById("selectAlertSound").value = String(id);
+        playAlertSound();
+      } else if (type === "timerSound") {
+        CONFIG.timerSoundId = id;
+        document.getElementById("selectTimerSound").value = String(id);
+        playTimerEndSound();
+      }
+
+      updatePresetBadges();
+      renderActiveTimersStack();
+    }
+
+    function stepPreset(type, delta) {
+      const len = 108;
+      if (type === "masterStyle") onSelectPreset(type, (CONFIG.masterStyleId + delta + len) % len);
+      if (type === "alertStyle") {
+        onSelectPreset(type, (CONFIG.alertStyleId + delta + len) % len);
+        previewCurrentAlertStyle();
+      }
+      if (type === "timerStyle") onSelectPreset(type, (CONFIG.timerStyleId + delta + len) % len);
+      if (type === "inOutFx") {
+        onSelectPreset(type, (CONFIG.inOutFxId + delta + len) % len);
+      }
+      if (type === "alertSound") onSelectPreset(type, (CONFIG.alertSoundId + delta + len) % len);
+      if (type === "timerSound") onSelectPreset(type, (CONFIG.timerSoundId + delta + len) % len);
+    }
+
+    function randomPreset(type) {
+      const rnd = Math.floor(Math.random() * 108);
+      onSelectPreset(type, rnd);
+      if (type === "alertStyle" || type === "masterStyle") previewCurrentAlertStyle();
+    }
+
+    function randomizeAllStyles() {
+      CONFIG.masterStyleId = Math.floor(Math.random() * 108);
+      CONFIG.alertStyleId = Math.floor(Math.random() * 108);
+      CONFIG.timerStyleId = Math.floor(Math.random() * 108);
+      CONFIG.inOutFxId = Math.floor(Math.random() * 108);
+      CONFIG.alertSoundId = Math.floor(Math.random() * 108);
+      CONFIG.timerSoundId = Math.floor(Math.random() * 108);
+
+      document.getElementById("selectMasterStyle").value = String(CONFIG.masterStyleId);
+      document.getElementById("selectAlertStyle").value = String(CONFIG.alertStyleId);
+      document.getElementById("selectTimerStyle").value = String(CONFIG.timerStyleId);
+      document.getElementById("selectInOutFx").value = (CONFIG.randomEffectOnAlert && CONFIG.randomEffectOnTimer) ? "RANDOM_BOTH" : String(CONFIG.inOutFxId);
+      document.getElementById("selectAlertSound").value = String(CONFIG.alertSoundId);
+      document.getElementById("selectTimerSound").value = String(CONFIG.timerSoundId);
+
+      updatePresetBadges();
+      renderActiveTimersStack();
+      previewCurrentAlertStyle();
+      showToast("Randomized across all 108+ Styles, Effects & Sounds!");
+    }
+
+    function updatePresetBadges() {
+      document.getElementById("masterStyleCountBadge").textContent = `#${CONFIG.masterStyleId + 1} / 108`;
+      document.getElementById("alertStyleCountBadge").textContent = `#${CONFIG.alertStyleId + 1} / 108`;
+      document.getElementById("timerStyleCountBadge").textContent = `#${CONFIG.timerStyleId + 1} / 108`;
+
+      const fxBadge = document.getElementById("fxCountBadge");
+      if (fxBadge) {
+        if (CONFIG.randomEffectOnAlert || CONFIG.randomEffectOnTimer) {
+          fxBadge.textContent = `🎲 RANDOM (108 FX)`;
+        } else {
+          fxBadge.textContent = `#${CONFIG.inOutFxId + 1} / 108`;
+        }
+      }
+
+      document.getElementById("alertSoundCountBadge").textContent = `#${CONFIG.alertSoundId + 1} / 108`;
+      document.getElementById("timerSoundCountBadge").textContent = `#${CONFIG.timerSoundId + 1} / 108`;
+
+      const summary = document.getElementById("activePresetSummary");
+      if (summary) {
+        const fxLabel = (CONFIG.randomEffectOnAlert || CONFIG.randomEffectOnTimer)
+          ? `🎲 Random FX (${lastChosenAlertFxName ? lastChosenAlertFxName.split('•')[0].trim() : '108 Pool'})`
+          : `FX #${CONFIG.inOutFxId + 1}`;
+        summary.textContent = `Style #${CONFIG.alertStyleId + 1} • Hold ${CONFIG.alertHoldSec}s • Timer #${CONFIG.timerStyleId + 1} • ${fxLabel}`;
+      }
+    }
+
+    /*************************************************************************
+     * 11. LIVE SIMULATOR & PRESET TEST BUTTONS
+     *************************************************************************/
+    function triggerPresetTest(kind) {
+      if (kind === "twitch_timer") {
+        triggerRewardEvent({
+          platform: "twitch",
+          user: "ShroudTTV",
+          avatar: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=160&auto=format&fit=crop&q=80",
+          title: "Hydrate & Posture Check!",
+          description: "Take a sip of water and sit up straight right now! (0:15)",
+          isStudioTest: true
+        });
+      } else if (kind === "kick_timer") {
+        triggerRewardEvent({
+          platform: "kick",
+          user: "KickLegend99",
+          avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160&auto=format&fit=crop&q=80",
+          title: "No HUD Challenge",
+          description: "Turn off the entire game HUD for the next 5 minutes! (5:00)",
+          isStudioTest: true
+        });
+      } else if (kind === "hour_timer") {
+        triggerRewardEvent({
+          platform: "twitch",
+          user: "CyberValkyrie",
+          avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80",
+          title: "1-Hour Hardcore Voice Changer",
+          description: "Enable robot pitch voice effect for a full hour! (1:00:00)",
+          isStudioTest: true
+        });
+      } else {
+        triggerRewardEvent({
+          platform: "kick",
+          user: "NeonSniper",
+          avatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=160&auto=format&fit=crop&q=80",
+          title: "Drop Current Weapon",
+          description: "Drop your primary weapon on the ground immediately!",
+          isStudioTest: true
+        });
+      }
+    }
+
+    function previewCurrentAlertStyle() {
+      const chosenFx = pickAlertInOutEffect(false);
+      lastChosenAlertFxName = chosenFx.name;
+      updatePresetBadges();
+      renderMainAlertPopup({
+        platform: simPlatform,
+        user: document.getElementById("simUser").value || "ValkyraeFan99",
+        avatar: document.getElementById("simAvatar").value,
+        title: document.getElementById("simTitle").value || "Invert Mouse Challenge",
+        description: document.getElementById("simDescription").value || "Invert mouse for 5 minutes! (5:00)",
+        timerInfo: { totalSeconds: 300 },
+        fx: chosenFx
+      });
+    }
+
+    function replaySelectedAnimation() {
+      previewCurrentAlertStyle();
+      playAlertSound();
+    }
+
+    function setSimPlatform(plat) {
+      simPlatform = plat;
+      const tBtn = document.getElementById("simPlatformTwitch");
+      const kBtn = document.getElementById("simPlatformKick");
+      if (plat === "twitch") {
+        tBtn.className = "py-2 rounded-xl border border-[#9146FF] bg-[#9146FF]/25 text-white text-xs font-bold flex items-center justify-center gap-2";
+        kBtn.className = "py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-bold flex items-center justify-center gap-2";
+      } else {
+        kBtn.className = "py-2 rounded-xl border border-[#53FC18] bg-[#53FC18]/20 text-white text-xs font-bold flex items-center justify-center gap-2";
+        tBtn.className = "py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-bold flex items-center justify-center gap-2";
+      }
+    }
+
+    function appendSimTime(tag) {
+      const box = document.getElementById("simDescription");
+      const cleaned = box.value.replace(/\(\s*\d+\s*:\s*\d+(?:\s*:\s*\d+)?\s*\)\s*$/, "").trim();
+      box.value = `${cleaned} ${tag}`;
+    }
+
+    function fireCustomSimulation() {
+      triggerRewardEvent({
+        platform: simPlatform,
+        user: document.getElementById("simUser").value.trim() || "StreamFan",
+        avatar: document.getElementById("simAvatar").value,
+        title: document.getElementById("simTitle").value.trim() || "Custom Channel Reward",
+        description: document.getElementById("simDescription").value.trim(),
+        isStudioTest: true
+      });
+    }
+
+    function fastForwardAllTimersTo3Sec() {
+      if (activeTimers.length === 0) {
+        showToast("No active timers! Trigger a timed reward first.");
+        return;
+      }
+      activeTimers.forEach(t => {
+        t.remainingSec = 3;
+        updateSingleTimerDOM(t);
+      });
+      showToast("All active timers set to 00:03 so you can test completion sound & Twitch/Kick chat!");
+    }
+
+    function clearAllTimers() {
+      activeTimers = [];
+      renderActiveTimersStack();
+      updateActiveTimerCounterUI();
+    }
+
+    /*************************************************************************
+     * 12. C# STREAMER.BOT HELPER SCRIPT GENERATOR & MODAL
+     * Focused strictly on broadcasting Reward + Avatar + Parsed Timer to Overlay.
+     * Chat messages are sent via the user's selected Streamer.bot Actions & Args!
+     *************************************************************************/
+    function generateCSharpScriptCode() {
+      const startArg = CONFIG.startArgName || "rewardMessage";
+      const endArg = CONFIG.endArgName || "timerMessage";
+
+      return `using System;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
+using Newtonsoft.Json;
+
+// ============================================================================
+// HOW TO SET UP YOUR CHAT ACTIONS IN STREAMER.BOT (NO C# NEEDED FOR CHAT!):
+// ----------------------------------------------------------------------------
+// 1. For On Reward Redeemed Action (${CONFIG.twitchStartActionName || "Twitch_Reward_Redeemed_Chat"} / ${CONFIG.kickStartActionName || "Kick_Reward_Redeemed_Chat"}):
+//    - Add Sub-Action: Twitch (or Kick) -> Chat -> Send Message to Channel
+//    - Set Message to: %${startArg}%   (or %chatMessage%)
+//
+// 2. For On Timer Finished Action (${CONFIG.twitchEndActionName || "Twitch_Timer_Finished_Chat"} / ${CONFIG.kickEndActionName || "Kick_Timer_Finished_Chat"}):
+//    - Add Sub-Action: Twitch (or Kick) -> Chat -> Send Message to Channel
+//    - Set Message to: %${endArg}%     (or %chatMessage%)
+//
+// ============================================================================
+// OPTIONAL C# HELPER FOR REWARD REDEMPTION TRIGGER -> OVERLAY BROADCAST:
+// (Grabs User Avatar + Parses (5:00) or (1:00:00) and broadcasts to Overlay)
+// ============================================================================
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string eventSource = args.ContainsKey("__source") && args["__source"] != null ? args["__source"].ToString() : "";
+        string platform = eventSource.IndexOf("Kick", StringComparison.OrdinalIgnoreCase) >= 0 ? "kick" : "twitch";
+
+        string redemptionId = GetArgString("redemptionId", "id", "rewardRedemptionId");
+        if (string.IsNullOrEmpty(redemptionId))
+        {
+            redemptionId = "sb_" + Guid.NewGuid().ToString("N").Substring(0, 10);
+        }
+
+        string user = GetArgString("user", "userName", "user_name", "displayName");
+        if (string.IsNullOrEmpty(user)) user = "Viewer";
+
+        string userLogin = GetArgString("userLogin", "user_login", "targetUserLogin");
+        if (string.IsNullOrEmpty(userLogin)) userLogin = user;
+
+        string rewardTitle = GetArgString("rewardName", "rewardTitle", "reward_title", "title");
+        if (string.IsNullOrEmpty(rewardTitle)) rewardTitle = "Channel Reward";
+
+        string rewardPrompt = GetArgString("rewardPrompt", "prompt", "reward_prompt", "description");
+        string userInput = GetArgString("rawInput", "userInput", "user_input", "message");
+
+        string fullDescription = rewardPrompt;
+        if (!string.IsNullOrWhiteSpace(userInput) && !string.Equals(userInput, rewardPrompt, StringComparison.OrdinalIgnoreCase))
+        {
+            fullDescription = string.IsNullOrWhiteSpace(fullDescription) ? userInput : $"{fullDescription} - {userInput}";
+        }
+
+        string avatarUrl = GetArgString("targetUserProfileImageUrl", "userProfileImageUrl", "user_avatar", "avatar");
+        if (string.IsNullOrEmpty(avatarUrl))
+        {
+            avatarUrl = $"https://decapi.me/twitch/avatar/{Uri.EscapeDataString(userLogin)}";
+        }
+
+        // Scan Description (and Title fallback) for Timer: (5:00), (1:00:00), or (1:0:0)
+        int totalSeconds = 0;
+        string humanDuration = "";
+        string textToScan = $"{fullDescription} {rewardTitle}".Trim();
+
+        Match m = Regex.Match(fullDescription ?? "", @"\\(\\s*(\\d+)\\s*:\\s*(\\d+)(?:\\s*:\\s*(\\d+))?\\s*\\)\\s*$");
+        if (!m.Success) m = Regex.Match(fullDescription ?? "", @"\\(\\s*(\\d+)\\s*:\\s*(\\d+)(?:\\s*:\\s*(\\d+))?\\s*\\)");
+        if (!m.Success) m = Regex.Match(textToScan, @"\\(\\s*(\\d+)\\s*:\\s*(\\d+)(?:\\s*:\\s*(\\d+))?\\s*\\)");
+
+        if (m.Success)
+        {
+            int hours = 0, mins = 0, secs = 0;
+            if (m.Groups[3].Success)
+            {
+                hours = int.Parse(m.Groups[1].Value);
+                mins  = int.Parse(m.Groups[2].Value);
+                secs  = int.Parse(m.Groups[3].Value);
+            }
+            else
+            {
+                mins = int.Parse(m.Groups[1].Value);
+                secs = int.Parse(m.Groups[2].Value);
+            }
+            totalSeconds = (hours * 3600) + (mins * 60) + secs;
+            humanDuration = FormatDurationLabel(hours, mins, secs);
+        }
+
+        // Broadcast Reward + Timer Payload to the OBS HTML Overlay via Streamer.bot WebSocket
+        // The Overlay will automatically call DoAction on your selected Twitch/Kick Actions
+        // with %${startArg}% on redemption and %${endArg}% when the timer finishes!
+        var payload = new
+        {
+            overlayType = "channelRewardAlert",
+            eventName = "RewardStudio.Redemption",
+            redemptionId = redemptionId,
+            platform = platform,
+            user = user,
+            userLogin = userLogin,
+            avatar = avatarUrl,
+            title = rewardTitle,
+            description = fullDescription,
+            durationSeconds = totalSeconds,
+            humanDuration = humanDuration,
+            startChatSent = false
+        };
+        CPH.WebsocketBroadcastJson(JsonConvert.SerializeObject(payload));
+
+        return true;
+    }
+
+    private string GetArgString(params string[] keys)
+    {
+        foreach (string k in keys)
+        {
+            if (CPH.TryGetArg(k, out string val) && !string.IsNullOrEmpty(val))
+                return val;
+        }
+        return "";
+    }
+
+    private string FormatDurationLabel(int h, int m, int s)
+    {
+        List<string> parts = new List<string>();
+        if (h > 0) parts.Add($"{h} {(h == 1 ? "Hour" : "Hours")}");
+        if (m > 0) parts.Add($"{m} {(m == 1 ? "Min" : "Mins")}");
+        if (s > 0 && h == 0) parts.Add($"{s} {(s == 1 ? "Sec" : "Secs")}");
+        return parts.Count > 0 ? string.Join(" ", parts) : "0 Secs";
+    }
+}`;
+    }
+
+    function openCSharpModal() {
+      document.getElementById("csharpCodeBlock").textContent = generateCSharpScriptCode();
+      const modal = document.getElementById("csharpModal");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    function closeCSharpModal() {
+      const modal = document.getElementById("csharpModal");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    function copyCSharpCode() {
+      const code = generateCSharpScriptCode();
+      const temp = document.createElement("textarea");
+      temp.value = code;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand("copy");
+      document.body.removeChild(temp);
+      showToast("Dual-Mode C# Streamer.bot Script copied to clipboard!");
+    }
+
+    /*************************************************************************
+     * 13. EXPORT TO STANDALONE OBS-STUDIO OVERLAY HTML
+     * Bakes in:
+     * - All 108 In/Out Effects + randomEffectOnAlert & randomEffectOnTimer
+     * - Automatic GetActions discovery + DoAction (with id & name) for Start & End Chat
+     * - Direct Twitch IRC WebSocket fallback (if configured)
+     *************************************************************************/
+    function exportOBSOverlayHTML() {
+      updateConfigFromUI();
+
+      const selectedMaster = CATALOG.masterStyles[CONFIG.masterStyleId] || CATALOG.masterStyles[0];
+      const selectedAlert = CATALOG.alertStyles[CONFIG.alertStyleId] || CATALOG.alertStyles[0];
+      const selectedTimer = CATALOG.timerStyles[CONFIG.timerStyleId] || CATALOG.timerStyles[0];
+      const selectedFx = CATALOG.inOutEffects[CONFIG.inOutFxId] || CATALOG.inOutEffects[0];
+      const selectedAlertSound = CATALOG.alertSounds[CONFIG.alertSoundId] || CATALOG.alertSounds[0];
+      const selectedTimerSound = CATALOG.timerSounds[CONFIG.timerSoundId] || CATALOG.timerSounds[0];
+
+      const exportedState = {
+        config: CONFIG,
+        master: selectedMaster,
+        alertStyle: selectedAlert,
+        timerStyle: selectedTimer,
+        fx: selectedFx,
+        allInOutEffects: CATALOG.inOutEffects,
+        alertSound: selectedAlertSound,
+        timerSound: selectedTimerSound,
+        flexClass: POSITION_FLEX_MAP[CONFIG.position] || "justify-end items-end"
+      };
+
+      const standaloneHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Streamer.bot OBS Channel Reward & Timer Overlay</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&family=Orbitron:wght@700;900&family=Press+Start+2P&family=Rajdhani:wght@600;700&family=Righteous&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: transparent !important;
+      font-family: 'Inter', sans-serif;
+    }
+    .avatar-circle { border-radius: 9999px; }
+    .avatar-squircle { border-radius: 28%; }
+    .avatar-rounded { border-radius: 12px; }
+    .avatar-sharp { border-radius: 2px; }
+    .avatar-hex { clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%); }
+    .avatar-diamond { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+    .avatar-octagon { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+    .avatar-shield { clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
+    .font-orbitron { font-family: 'Orbitron', sans-serif; }
+    .font-mono-tech { font-family: 'JetBrains Mono', monospace; }
+    .font-arcade { font-family: 'Press Start 2P', monospace; }
+    .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+    .font-righteous { font-family: 'Righteous', sans-serif; }
+    .timer-stack-item { transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+  </style>
+</head>
+<body>
+  <div id="overlayRoot" class="fixed inset-0 pointer-events-none p-8 flex flex-col ${exportedState.flexClass}">
+    <div id="overlayAnchor" class="w-full max-w-[450px] flex flex-col gap-3" style="transform: scale(${exportedState.config.overlayScale / 100});">
+      <div id="alertPopupSlot" class="w-full"></div>
+      <div id="activeTimersStack" class="w-full flex flex-col gap-2.5"></div>
+    </div>
+  </div>
+
+  <script>
+    const STATE = ${JSON.stringify(exportedState, null, 2)};
+    let activeTimers = [];
+    let timerInterval = null;
+    let alertHideTimeout = null;
+    let ws = null;
+    let audioCtx = null;
+    const actionSlots = {
+      twitchStart: { name: STATE.config.twitchStartActionName || "", id: STATE.config.twitchStartActionId || "" },
+      twitchEnd:   { name: STATE.config.twitchEndActionName || "",   id: STATE.config.twitchEndActionId || "" },
+      kickStart:   { name: STATE.config.kickStartActionName || "",   id: STATE.config.kickStartActionId || "" },
+      kickEnd:     { name: STATE.config.kickEndActionName || "",     id: STATE.config.kickEndActionId || "" }
+    };
+    const sentChatDedupe = new Set();
+
+    function escapeHtml(str) {
+      return String(str || "").replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+    }
+
+    function pickAlertFx() {
+      const pool = STATE.allInOutEffects || [STATE.fx];
+      if (STATE.config.randomEffectOnAlert && pool.length > 0) {
+        return pool[Math.floor(Math.random() * pool.length)] || STATE.fx;
+      }
+      return STATE.fx;
+    }
+
+    function pickTimerFx() {
+      const pool = STATE.allInOutEffects || [STATE.fx];
+      if (STATE.config.randomEffectOnTimer && pool.length > 0) {
+        return pool[Math.floor(Math.random() * pool.length)] || STATE.fx;
+      }
+      return STATE.fx;
+    }
+
+    function playSynthSound(preset, customUrl, isTimerEnd) {
+      if (STATE.config.volume <= 0) return;
+      if (customUrl && customUrl.length > 4) {
+        const a = new Audio(customUrl);
+        a.volume = STATE.config.volume;
+        a.play().catch(() => {});
+        return;
+      }
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const now = audioCtx.currentTime;
+        const notes = preset.notes || [1, 1.25, 1.5, 2];
+        const step = preset.tempo || 0.08;
+        notes.forEach((mult, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = preset.wave || "triangle";
+          const startTime = now + idx * step;
+          const dur = step * (isTimerEnd ? 1.8 : 1.5);
+          osc.frequency.setValueAtTime(preset.baseFreq * mult, startTime);
+          gain.gain.setValueAtTime(0.0001, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.25 * STATE.config.volume, startTime + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + dur + 0.02);
+        });
+      } catch (e) {}
+    }
+
+    function parseRewardTimerFromDescription(desc, titleFallback) {
+      const combined = ((desc || "") + " " + (titleFallback || "")).trim();
+      if (!combined) return null;
+      const endRx = /\\(\\s*(\\d+)\\s*:\\s*(\\d+)(?:\\s*:\\s*(\\d+))?\\s*\\)\\s*$/;
+      const anyRx = /\\(\\s*(\\d+)\\s*:\\s*(\\d+)(?:\\s*:\\s*(\\d+))?\\s*\\)/;
+      const m = (desc && desc.match(endRx)) || (desc && desc.match(anyRx)) || combined.match(endRx) || combined.match(anyRx);
+      if (!m) return null;
+      let h = 0, min = 0, s = 0;
+      if (m[3] !== undefined) { h = parseInt(m[1],10)||0; min = parseInt(m[2],10)||0; s = parseInt(m[3],10)||0; }
+      else { min = parseInt(m[1],10)||0; s = parseInt(m[2],10)||0; }
+      const totalSeconds = h * 3600 + min * 60 + s;
+      if (totalSeconds <= 0) return null;
+      return { totalSeconds, formattedDuration: formatHumanDuration(totalSeconds) };
+    }
+
+    function formatHumanDuration(totalSeconds) {
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      const parts = [];
+      if (h > 0) parts.push(h + (h === 1 ? " Hour" : " Hours"));
+      if (m > 0) parts.push(m + (m === 1 ? " Min" : " Mins"));
+      if (s > 0 && h === 0) parts.push(s + (s === 1 ? " Sec" : " Secs"));
+      return parts.length > 0 ? parts.join(" ") : "0 Secs";
+    }
+
+    function formatClockReadout(sec) {
+      const s = Math.max(0, Math.floor(sec));
+      const hrs = Math.floor(s / 3600);
+      const mins = Math.floor((s % 3600) / 60);
+      const secs = s % 60;
+      if (hrs > 0) {
+        return hrs + ":" + String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+      }
+      return String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+    }
+
+    function sendChatCallback(platform, messageText, stage, redemptionId, extraVars) {
+      if (!messageText) return;
+      const stageLower = (stage || "start").toLowerCase();
+      const isEnd = stageLower === "end";
+      const isKick = (platform || "twitch").toLowerCase() === "kick";
+      const key = (redemptionId || "msg") + ":" + stageLower;
+
+      const slot = isKick
+        ? (isEnd ? actionSlots.kickEnd : actionSlots.kickStart)
+        : (isEnd ? actionSlots.twitchEnd : actionSlots.twitchStart);
+
+      if (!slot || !slot.name) return;
+      if (redemptionId && sentChatDedupe.has(key)) return;
+      if (redemptionId) sentChatDedupe.add(key);
+
+      const customArgKey = isEnd
+        ? (STATE.config.endArgName || "timerMessage").trim()
+        : (STATE.config.startArgName || "rewardMessage").trim();
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const actionObj = { name: slot.name };
+        if (slot.id) actionObj.id = slot.id;
+        const vars = extraVars || {};
+
+        ws.send(JSON.stringify({
+          request: "DoAction",
+          action: actionObj,
+          args: {
+            [customArgKey]: messageText,
+            rewardMessage: messageText,
+            timerMessage: messageText,
+            chatMessage: messageText,
+            message: messageText,
+            rawInput: messageText,
+            platform: platform || "twitch",
+            eventPhase: stageLower,
+            user: vars.user || "",
+            reward: vars.reward || "",
+            description: vars.description || "",
+            duration: vars.duration || "",
+            redemptionId: redemptionId || ("obs_" + Date.now())
+          },
+          id: "obs_chat_" + Date.now()
+        }));
+      }
+    }
+
+    async function resolveAvatar(platform, userLogin, currentAvatar) {
+      if (currentAvatar && currentAvatar.startsWith("http") && !currentAvatar.includes("unavatar.io")) return currentAvatar;
+      if (platform === "twitch" && userLogin) {
+        try {
+          const r = await fetch("https://decapi.me/twitch/avatar/" + encodeURIComponent(userLogin));
+          if (r.ok) {
+            const txt = (await r.text()).trim();
+            if (txt.startsWith("http")) return txt;
+          }
+        } catch (e) {}
+      }
+      return currentAvatar || ("https://unavatar.io/" + platform + "/" + encodeURIComponent(userLogin || "streamer"));
+    }
+
+    async function triggerRewardEvent(payload) {
+      const platform = (payload.platform || "twitch").toLowerCase();
+      const user = payload.user || "Viewer";
+      const userLogin = payload.userLogin || user;
+      const title = payload.title || "Channel Reward";
+      const description = (payload.description || "").trim();
+      const redemptionId = payload.redemptionId || ("obs_red_" + Date.now() + "_" + Math.random().toString(36).slice(2,6));
+      const avatar = await resolveAvatar(platform, userLogin, payload.avatar);
+
+      const timerInfo = payload.durationSeconds
+        ? { totalSeconds: Number(payload.durationSeconds), formattedDuration: payload.humanDuration || formatHumanDuration(Number(payload.durationSeconds)) }
+        : parseRewardTimerFromDescription(description, title);
+
+      playSynthSound(STATE.alertSound, STATE.config.customAlertAudioUrl, false);
+      const alertFx = pickAlertFx();
+      renderMainAlert({ platform, user, avatar, title, description, timerInfo, fx: alertFx });
+
+      const humanDur = timerInfo ? timerInfo.formattedDuration : "Instant";
+      if (!payload.startChatSent) {
+        let startMsg = STATE.config.startChatTemplate
+          .replace(/\\{user\\}/gi, user)
+          .replace(/\\{reward\\}/gi, title)
+          .replace(/\\{description\\}/gi, description)
+          .replace(/\\{duration\\}/gi, humanDur);
+        if (!description) startMsg = startMsg.replace(/\\s*-\\s*$/, "").trim();
+        sendChatCallback(platform, startMsg, "start", redemptionId, {
+          user,
+          reward: title,
+          description,
+          duration: humanDur
+        });
+      }
+
+      if (timerInfo && timerInfo.totalSeconds > 0) {
+        const timerFx = pickTimerFx();
+        const tObj = {
+          id: "t_" + Date.now() + "_" + Math.random().toString(36).slice(2,6),
+          redemptionId,
+          platform, user, avatar, title, description,
+          totalSec: timerInfo.totalSeconds,
+          remainingSec: timerInfo.totalSeconds,
+          durationLabel: timerInfo.formattedDuration,
+          fx: timerFx,
+          updatedAt: Date.now()
+        };
+        if (STATE.config.moveNewestToTop) activeTimers.unshift(tObj);
+        else activeTimers.push(tObj);
+        renderTimers(tObj.id);
+        startTimerLoop();
+      }
+    }
+
+    function renderMainAlert(data) {
+      const slot = document.getElementById("alertPopupSlot");
+      if (alertHideTimeout) clearTimeout(alertHideTimeout);
+      const master = STATE.master;
+      const style = STATE.alertStyle;
+      const fx = data.fx || STATE.fx;
+      const isKick = data.platform === "kick";
+      const platformName = isKick ? "KICK" : "TWITCH";
+      const flexDir = master.dir === "col" ? "flex-col items-center text-center" : (master.dir === "row-reverse" ? "flex-row-reverse text-right" : "flex-row text-left");
+
+      slot.innerHTML = \`
+        <div id="liveAlertCard" class="relative overflow-hidden \${master.radius} \${master.pad} \${master.font}"
+             style="background: linear-gradient(135deg, \${style.bg1} 0%, \${style.bg2} 100%); border: \${style.borderStyle} \${style.accent}; box-shadow: 0 14px 35px -5px \${style.glow}; color: \${style.text}; transform: \${fx.inTx}; opacity: 0; filter: blur(\${fx.blur || '0px'}); transition: all \${fx.dur}ms \${fx.ease};">
+          <div class="flex \${flexDir} gap-3.5 items-center relative z-10">
+            <img src="\${escapeHtml(data.avatar)}" class="\${master.avatarSize} \${master.avatarClip} object-cover" style="border: 2px solid \${style.accent};" />
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5 mb-0.5">
+                <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full" style="background:\${style.accent}25; color:\${style.accent}; border:1px solid \${style.accent}60;">\${platformName} REWARD</span>
+                <span class="text-xs font-bold truncate" style="color: \${style.sub};">\${escapeHtml(data.user)}</span>
+              </div>
+              <h3 class="text-lg font-black leading-snug" style="color: \${style.text};">\${escapeHtml(data.title)}</h3>
+              \${data.description ? \`<p class="text-xs mt-1 opacity-95" style="color: \${style.sub};">\${escapeHtml(data.description)}</p>\` : ''}
+            </div>
+          </div>
+          \${STATE.config.showAlertHoldBar !== false ? \`
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-black/40 overflow-hidden">
+              <div id="liveAlertHoldBar" class="h-full w-full" style="background: \${style.accent}; transform-origin: left center; transform: scaleX(1);"></div>
+            </div>
+          \` : ''}
+        </div>\`;
+
+      const holdMs = Math.max(0.5, Number(STATE.config.alertHoldSec) || 6) * 1000;
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const c = document.getElementById("liveAlertCard");
+        if (c) { c.style.transform = "translate(0,0) scale(1)"; c.style.opacity = "1"; c.style.filter = "blur(0px)"; }
+        const hb = document.getElementById("liveAlertHoldBar");
+        if (hb) { hb.style.transition = "transform " + holdMs + "ms linear"; hb.style.transform = "scaleX(0)"; }
+      }));
+
+      alertHideTimeout = setTimeout(() => {
+        const c = document.getElementById("liveAlertCard");
+        if (c) {
+          c.style.transform = fx.outTx;
+          c.style.opacity = "0";
+          c.style.filter = "blur(" + (fx.blur || "0px") + ")";
+          setTimeout(() => { slot.innerHTML = ""; }, fx.dur + 50);
+        }
+      }, holdMs);
+    }
+
+    function startTimerLoop() {
+      if (timerInterval) return;
+      timerInterval = setInterval(() => {
+        if (activeTimers.length === 0) { clearInterval(timerInterval); timerInterval = null; return; }
+        const done = [];
+        activeTimers.forEach(t => {
+          if (t.completing) return;
+          t.remainingSec = Math.max(0, t.remainingSec - 1);
+          const cEl = document.getElementById("timer-clock-" + t.id);
+          if (cEl) cEl.textContent = formatClockReadout(t.remainingSec);
+          const bEl = document.getElementById("timer-bar-" + t.id);
+          if (bEl) bEl.style.width = ((t.remainingSec / t.totalSec) * 100) + "%";
+          if (t.remainingSec <= 0) {
+            t.completing = true;
+            done.push(t);
+          }
+        });
+        done.forEach(d => {
+          playSynthSound(STATE.timerSound, STATE.config.customTimerAudioUrl, true);
+          const endMsg = STATE.config.endChatTemplate
+            .replace(/\\{user\\}/gi, d.user)
+            .replace(/\\{reward\\}/gi, d.title)
+            .replace(/\\{description\\}/gi, d.description)
+            .replace(/\\{duration\\}/gi, d.durationLabel);
+          sendChatCallback(d.platform, endMsg, "end", d.redemptionId, {
+            user: d.user,
+            reward: d.title,
+            description: d.description,
+            duration: d.durationLabel
+          });
+
+          const el = document.getElementById("timer-card-" + d.id);
+          const fx = d.fx || STATE.fx;
+          if (el) {
+            el.style.transition = "all " + fx.dur + "ms " + fx.ease;
+            el.style.transform = fx.outTx;
+            el.style.opacity = "0";
+          }
+          setTimeout(() => {
+            activeTimers = activeTimers.filter(x => x.id !== d.id);
+            renderTimers();
+          }, (fx.dur || 400) + 40);
+        });
+      }, 1000);
+    }
+
+    function renderTimers(newlyAddedId) {
+      const container = document.getElementById("activeTimersStack");
+      const master = STATE.master;
+      const tStyle = STATE.timerStyle;
+      container.innerHTML = activeTimers.map(t => {
+        const pct = Math.max(0, Math.min(100, (t.remainingSec / t.totalSec) * 100));
+        const fx = t.fx || STATE.fx;
+        const initStyle = (t.id === newlyAddedId)
+          ? \`transform: \${fx.inTx}; opacity: 0; transition: all \${fx.dur}ms \${fx.ease};\`
+          : \`transform: translate(0,0) scale(1); opacity: 1;\`;
+        return \`
+          <div id="timer-card-\${t.id}" class="timer-stack-item relative overflow-hidden \${master.radius} p-3.5 \${master.font}"
+               style="background: linear-gradient(135deg, \${tStyle.bg1}f5, \${tStyle.bg2}f5); border: 1.5px solid \${tStyle.accent}; box-shadow: 0 8px 25px \${tStyle.glow}; color: \${tStyle.text}; \${initStyle}">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <img src="\${escapeHtml(t.avatar)}" class="w-10 h-10 \${master.avatarClip} object-cover shrink-0" style="border: 1.5px solid \${tStyle.accent};" />
+                <div class="min-w-0">
+                  <div class="text-[11px] font-bold truncate" style="color:\${tStyle.sub};">\${escapeHtml(t.user)}</div>
+                  <div class="text-sm font-extrabold truncate" style="color:\${tStyle.text};">\${escapeHtml(t.title)}</div>
+                </div>
+              </div>
+              <div id="timer-clock-\${t.id}" class="font-mono-tech text-lg font-black px-2.5 py-1 rounded-lg bg-black/45" style="color:\${tStyle.accent};">
+                \${formatClockReadout(t.remainingSec)}
+              </div>
+            </div>
+            <div class="w-full h-2 bg-black/50 rounded-full overflow-hidden mt-2.5">
+              <div id="timer-bar-\${t.id}" class="h-full rounded-full transition-all duration-500" style="width: \${pct}%; background: \${tStyle.accent};"></div>
+            </div>
+          </div>\`;
+      }).join("");
+
+      if (newlyAddedId) {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const el = document.getElementById("timer-card-" + newlyAddedId);
+          if (el) { el.style.transform = "translate(0,0) scale(1)"; el.style.opacity = "1"; }
+        }));
+      }
+    }
+
+    function connectOBSWebSocket() {
+      ws = new WebSocket(STATE.config.wsUrl || "ws://127.0.0.1:8080/");
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          request: "Subscribe",
+          id: "obs_reward_overlay",
+          events: { Twitch: ["RewardRedemption"], Kick: ["RewardRedemption"], General: ["Custom"] }
+        }));
+        ws.send(JSON.stringify({ request: "GetActions", id: "fetch-actions" }));
+      };
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.id === "fetch-actions" || Array.isArray(msg.actions)) {
+            const list = Array.isArray(msg.actions) ? msg.actions : [];
+            Object.keys(actionSlots).forEach(k => {
+              const targetName = (actionSlots[k].name || "").toLowerCase();
+              if (!targetName) return;
+              const match = list.find(a => (a.name || "").toLowerCase() === targetName);
+              if (match) {
+                actionSlots[k].id = match.id;
+                actionSlots[k].name = match.name;
+              }
+            });
+            return;
+          }
+          if (!msg.event || !msg.data) return;
+          const d = msg.data;
+          const customPayload = (d.overlayType === "channelRewardAlert" || d.eventName === "RewardStudio.Redemption")
+            ? d
+            : ((d.data && (d.data.overlayType === "channelRewardAlert" || d.data.eventName === "RewardStudio.Redemption")) ? d.data : null);
+
+          if (customPayload) {
+            triggerRewardEvent(customPayload);
+            return;
+          }
+          if ((msg.event.type || "").toLowerCase() === "rewardredemption") {
+            const red = d.redemption || d;
+            const reward = red.reward || d.reward || {};
+            const uObj = red.user || d.user || {};
+            const platform = (msg.event.source || "").toLowerCase().includes("kick") ? "kick" : "twitch";
+            const user = red.user_name || d.user_name || uObj.display_name || uObj.name || uObj.username || "Viewer";
+            const userLogin = red.user_login || d.user_login || uObj.login || user;
+            const rawPrompt = reward.prompt || reward.description || d.prompt || d.rewardPrompt || "";
+            const userInput = red.user_input || d.user_input || d.rawInput || d.message || "";
+            const fullDesc = [rawPrompt, (userInput && userInput !== rawPrompt) ? userInput : ""].filter(Boolean).join(" - ");
+            triggerRewardEvent({
+              redemptionId: red.id || d.id || ("nat_" + Date.now()),
+              platform,
+              user,
+              userLogin,
+              avatar: d.user_avatar || uObj.profile_image_url || "",
+              title: reward.title || d.reward_title || "Channel Reward",
+              description: fullDesc,
+              startChatSent: false
+            });
+          }
+        } catch (err) {}
+      };
+      ws.onclose = () => setTimeout(connectOBSWebSocket, 4000);
+    }
+
+    window.addEventListener("load", () => {
+      connectOBSWebSocket();
+    });
+  <\/script>
+</body>
+</html>`;
+
+      const blob = new Blob([standaloneHtml], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "streamerbot-obs-reward-overlay.html";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast("Exported streamerbot-obs-reward-overlay.html with Random FX & Auto-Chat Bridge!");
+    }
+
+    function setStageBackdrop(mode) {
+      const stage = document.getElementById("obsPreviewStage");
+      const btnGame = document.getElementById("bgBtn-game");
+      const btnChecker = document.getElementById("bgBtn-checker");
+      if (mode === "checker") {
+        stage.classList.remove("obs-game-backdrop");
+        stage.classList.add("obs-checkerboard");
+        btnChecker.className = "px-2.5 py-1 rounded-lg bg-indigo-600/30 border border-indigo-500/50 text-indigo-200 text-[11px] font-medium";
+        btnGame.className = "px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-medium";
+      } else {
+        stage.classList.remove("obs-checkerboard");
+        stage.classList.add("obs-game-backdrop");
+        btnGame.className = "px-2.5 py-1 rounded-lg bg-indigo-600/30 border border-indigo-500/50 text-indigo-200 text-[11px] font-medium";
+        btnChecker.className = "px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-medium";
+      }
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-pane").forEach(el => el.classList.add("hidden"));
+      document.getElementById(tabId).classList.remove("hidden");
+
+      document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.className = "tab-btn py-2 px-1 rounded-lg text-slate-400 hover:bg-slate-800/60 flex flex-col items-center gap-1 transition";
+      });
+      const activeBtn = document.getElementById("btn-" + tabId);
+      if (activeBtn) {
+        activeBtn.className = "tab-btn py-2 px-1 rounded-lg bg-indigo-600 text-white flex flex-col items-center gap-1 transition shadow";
+      }
+    }
+
+    /*************************************************************************
+     * 14. HELPERS & INITIALIZATION
+     *************************************************************************/
+    function escapeHtml(str) {
+      return String(str || "").replace(/[&<>"']/g, s => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[s]));
+    }
+
+    function showToast(msg) {
+      const banner = document.getElementById("toastBanner");
+      const text = document.getElementById("toastMessage");
+      if (!banner || !text) return;
+      text.textContent = msg;
+      banner.classList.remove("opacity-0", "translate-y-3");
+      banner.classList.add("opacity-100", "translate-y-0");
+      setTimeout(() => {
+        banner.classList.add("opacity-0", "translate-y-3");
+        banner.classList.remove("opacity-100", "translate-y-0");
+      }, 3200);
+    }
+
+    window.onload = function () {
+      buildAll108Catalogs();
+      populateAllDropdowns();
+      setScreenPosition("bottom-right");
+      connectWebSocket(false);
+
+      // Trigger an initial welcome demo reward with timer so the user immediately sees the alert + timer stack in action
+      setTimeout(() => {
+        triggerRewardEvent({
+          platform: "twitch",
+          user: "KaiCenatLive",
+          avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80",
+          title: "Hydrate & Posture Check!",
+          description: "Drink a full glass of water and sit up straight! (5:00)",
+          isStudioTest: true
+        });
+      }, 450);
+    };
+  </script>
+</body>
+</html>
