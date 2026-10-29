@@ -11,6 +11,10 @@
 
 [✨ Features](#-what-this-suite-does) • [⏱️ Timer Syntax](#️-automatic-timer-syntax) • [🚀 Setup Guide](#-how-to-set-up-step-by-step) • [💬 Chat Actions](#-setting-up-automated-chat-messages) • [🛠️ Troubleshooting](#️-troubleshooting)
 
+![https://github.com/MrrZed0/Alerts_All_Platforms/blob/main/Preview.png](https://github.com/MrrZed0/Custom-Channel-Rewards-Overlays-With-Timer/blob/main/1.png?raw=true)
+![https://github.com/MrrZed0/Alerts_All_Platforms/blob/main/Preview.png](https://github.com/MrrZed0/Custom-Channel-Rewards-Overlays-With-Timer/blob/main/2.png?raw=true)
+
+
 </div>
 
 ---
