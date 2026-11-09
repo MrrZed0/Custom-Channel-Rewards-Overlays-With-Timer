@@ -1,0 +1,3079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Streamer.bot OBS Channel Reward &amp; Timer Overlay</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&family=Orbitron:wght@700;900&family=Press+Start+2P&family=Rajdhani:wght@600;700&family=Righteous&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100vw; height: 100vh;
+      overflow: hidden; background: transparent !important;
+      font-family: 'Inter', sans-serif;
+    }
+    .avatar-circle   { border-radius: 9999px; }
+    .avatar-squircle { border-radius: 28%; }
+    .avatar-rounded  { border-radius: 12px; }
+    .avatar-sharp    { border-radius: 2px; }
+    .avatar-hex      { clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%); }
+    .avatar-diamond  { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+    .avatar-octagon  { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+    .avatar-shield   { clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
+    .avatar-blade    { clip-path: polygon(0 12%, 88% 0, 100% 88%, 12% 100%); }
+    .avatar-arch     { border-radius: 50% 50% 14% 14% / 46% 46% 14% 14%; }
+    .avatar-bevel    { clip-path: polygon(22% 0, 100% 0, 100% 78%, 78% 100%, 0 100%, 0 22%); }
+
+    .font-orbitron  { font-family: 'Orbitron', sans-serif; }
+    .font-mono-tech { font-family: 'JetBrains Mono', monospace; }
+    .font-arcade    { font-family: 'Press Start 2P', monospace; }
+    .font-rajdhani  { font-family: 'Rajdhani', sans-serif; }
+    .font-righteous { font-family: 'Righteous', sans-serif; }
+
+    .timer-stack-item { transition: all .45s cubic-bezier(.22,1,.36,1); }
+
+    @keyframes sbAmbientGlow {
+      0%,100% { box-shadow: 0 10px 30px -8px var(--amb-c, rgba(99,102,241,.5)); }
+      50%     { box-shadow: 0 10px 46px -4px var(--amb-c, rgba(99,102,241,.95)); }
+    }
+    @keyframes sbAmbientFloat   { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-4px);} }
+    @keyframes sbAmbientBreathe { 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.016);} }
+    @keyframes sbAmbientTilt    { 0%,100%{ transform: rotate(-.5deg);} 50%{ transform: rotate(.5deg);} }
+    @keyframes sbSheen          { 0%{ background-position: -220% 0; } 100%{ background-position: 220% 0; } }
+    @keyframes sbScanDrift      { 0%{ transform: translateY(-100%);} 100%{ transform: translateY(260%);} }
+    @keyframes sbBorderRun      { 0%{ background-position: 0% 50%; } 100%{ background-position: 300% 50%; } }
+    @keyframes sbUrgentFlash    { 0%,100%{ opacity: .18; } 50%{ opacity: .55; } }
+
+    .amb-glow    { animation: sbAmbientGlow 2.6s ease-in-out infinite; }
+    .amb-float   { animation: sbAmbientFloat 3.4s ease-in-out infinite; }
+    .amb-breathe { animation: sbAmbientBreathe 3s ease-in-out infinite; }
+    .amb-tilt    { animation: sbAmbientTilt 4.2s ease-in-out infinite; }
+
+    .fx-sheen::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+      background: linear-gradient(110deg, transparent 32%, rgba(255,255,255,.17) 48%, transparent 64%);
+      background-size: 220% 100%;
+      animation: sbSheen 3.4s ease-in-out infinite;
+    }
+    .fx-scan::after {
+      content: ""; position: absolute; left: 0; right: 0; height: 26%;
+      pointer-events: none; z-index: 2;
+      background: linear-gradient(180deg, transparent, rgba(255,255,255,.1), transparent);
+      animation: sbScanDrift 3.1s linear infinite;
+    }
+    .fx-runline {
+      background-image: linear-gradient(90deg,
+        var(--run-a, #6366f1), var(--run-b, #a855f7), var(--run-a, #6366f1),
+        var(--run-b, #a855f7), var(--run-a, #6366f1));
+      background-size: 300% 100%;
+      animation: sbBorderRun 3.6s linear infinite;
+    }
+    .timer-urgent { animation: sbAmbientGlow 1s ease-in-out infinite; }
+    .timer-urgent .urgent-veil { animation: sbUrgentFlash 1s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+  <div id="overlayRoot" class="fixed inset-0 pointer-events-none flex flex-col justify-start items-end"
+       style="padding: 32px;">
+    <div id="overlayAnchor" class="w-full flex flex-col gap-3"
+         style="max-width:450px; transform: scale(1);">
+      <div id="alertPopupSlot" class="w-full"></div>
+      <div id="activeTimersStack" class="w-full flex flex-col gap-2.5"></div>
+      <div id="timerOverflowSlot" class="w-full"></div>
+    </div>
+  </div>
+
+  <script>
+    const STATE = {
+  "config": {
+    "wsUrl": "ws://127.0.0.1:8080/",
+    "twitchStartActionName": "Twitch On Reward Redeemed",
+    "twitchStartActionId": "d6a6ba11-fac2-40f6-bc92-55bf5d7e5a28",
+    "twitchEndActionName": "Twitch On Timer Finished",
+    "twitchEndActionId": "4a5ca9aa-1716-4061-9bb3-b84876344508",
+    "kickStartActionName": "Kick On Reward Redeemed",
+    "kickStartActionId": "9c4460a9-3b5f-4a8a-b365-5a59a9f6b791",
+    "kickEndActionName": "Kick On Timer Finished",
+    "kickEndActionId": "43826af9-577d-4bb9-85bc-da4761c202af",
+    "startArgName": "rewardMessage",
+    "endArgName": "timerMessage",
+    "sendChatOnTests": true,
+    "autoReconnect": true,
+    "position": "top-right",
+    "overlayScale": 100,
+    "cardWidth": 450,
+    "edgePad": 32,
+    "moveNewestToTop": true,
+    "maxVisibleTimers": 6,
+    "urgentSec": 10,
+    "urgentPulse": true,
+    "tickCountdown": true,
+    "showTimerBar": true,
+    "showTimerUser": true,
+    "alertHoldSec": 6,
+    "showAlertHoldBar": true,
+    "showDescription": true,
+    "stripTimeTag": true,
+    "showPlatformBadge": true,
+    "startChatTemplate": "{user} redeemed {reward} - {description}",
+    "endChatTemplate": "{reward} Is Over After {duration}",
+    "masterStyleId": 0,
+    "alertStyleId": 53,
+    "timerStyleId": 102,
+    "inOutFxId": 1,
+    "randomEffectOnAlert": true,
+    "randomEffectOnTimer": true,
+    "ambientAlert": "glow",
+    "ambientTimer": "glow",
+    "alertSoundId": 40,
+    "timerSoundId": 26,
+    "volume": 1,
+    "customAlertAudioUrl": "",
+    "customTimerAudioUrl": ""
+  },
+  "master": {
+    "id": 0,
+    "name": "#1 - Broadcast Pro Banner (Circle Halo)",
+    "dir": "row",
+    "align": "left",
+    "font": "font-sans",
+    "badgePos": "top-right",
+    "pad": "p-4",
+    "radius": "rounded-2xl",
+    "avatarClip": "avatar-circle",
+    "avatarSize": "w-14 h-14",
+    "avatarRing": "ring-2 ring-white/40"
+  },
+  "alertStyle": {
+    "id": 53,
+    "name": "#54 - Crimson Blood Moon • Minimalist Shadow Luxe",
+    "bg1": "#24070b",
+    "bg2": "#3d0a11",
+    "accent": "#f43f5e",
+    "text": "#fff1f2",
+    "sub": "#fda4af",
+    "glow": "rgba(244,63,94,0.55)",
+    "borderStyle": "1px solid",
+    "topBar": false,
+    "scanline": false,
+    "glass": false,
+    "runline": false
+  },
+  "timerStyle": {
+    "id": 102,
+    "name": "#103 - Holographic Strip (Crimson Blood Moon)",
+    "archetype": "holo-strip",
+    "bg1": "#24070b",
+    "bg2": "#3d0a11",
+    "accent": "#f43f5e",
+    "text": "#fff1f2",
+    "sub": "#fda4af",
+    "glow": "rgba(244,63,94,0.55)"
+  },
+  "fx": {
+    "id": 1,
+    "name": "#2 - Slide Thrust • Ultra Fast (280ms)",
+    "inTx": "translateX(120%)",
+    "outTx": "translateX(120%)",
+    "dur": 280,
+    "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "blur": "0px"
+  },
+  "allInOutEffects": [
+    {
+      "id": 0,
+      "name": "#1 - Slide Thrust • Snappy Spring (450ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 1,
+      "name": "#2 - Slide Thrust • Ultra Fast (280ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 2,
+      "name": "#3 - Slide Thrust • Cinematic Smooth (650ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 3,
+      "name": "#4 - Slide Thrust • Heavy Bounce (750ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 4,
+      "name": "#5 - Slide Thrust • Motion Blur Warp (500ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 5,
+      "name": "#6 - Slide Thrust • Elastic Overdrive (850ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 6,
+      "name": "#7 - Slide Thrust • Instant Snap (180ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 7,
+      "name": "#8 - Slide Thrust • Slow Drift (1100ms)",
+      "inTx": "translateX(120%)",
+      "outTx": "translateX(120%)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 8,
+      "name": "#9 - Slide From Left • Snappy Spring (450ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 9,
+      "name": "#10 - Slide From Left • Ultra Fast (280ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 10,
+      "name": "#11 - Slide From Left • Cinematic Smooth (650ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 11,
+      "name": "#12 - Slide From Left • Heavy Bounce (750ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 12,
+      "name": "#13 - Slide From Left • Motion Blur Warp (500ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 13,
+      "name": "#14 - Slide From Left • Elastic Overdrive (850ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 14,
+      "name": "#15 - Slide From Left • Instant Snap (180ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 15,
+      "name": "#16 - Slide From Left • Slow Drift (1100ms)",
+      "inTx": "translateX(-120%)",
+      "outTx": "translateX(-120%)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 16,
+      "name": "#17 - Drop From Sky • Snappy Spring (450ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 17,
+      "name": "#18 - Drop From Sky • Ultra Fast (280ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 18,
+      "name": "#19 - Drop From Sky • Cinematic Smooth (650ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 19,
+      "name": "#20 - Drop From Sky • Heavy Bounce (750ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 20,
+      "name": "#21 - Drop From Sky • Motion Blur Warp (500ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 21,
+      "name": "#22 - Drop From Sky • Elastic Overdrive (850ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 22,
+      "name": "#23 - Drop From Sky • Instant Snap (180ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 23,
+      "name": "#24 - Drop From Sky • Slow Drift (1100ms)",
+      "inTx": "translateY(-130%)",
+      "outTx": "translateY(-130%)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 24,
+      "name": "#25 - Rise From Floor • Snappy Spring (450ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 25,
+      "name": "#26 - Rise From Floor • Ultra Fast (280ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 26,
+      "name": "#27 - Rise From Floor • Cinematic Smooth (650ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 27,
+      "name": "#28 - Rise From Floor • Heavy Bounce (750ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 28,
+      "name": "#29 - Rise From Floor • Motion Blur Warp (500ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 29,
+      "name": "#30 - Rise From Floor • Elastic Overdrive (850ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 30,
+      "name": "#31 - Rise From Floor • Instant Snap (180ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 31,
+      "name": "#32 - Rise From Floor • Slow Drift (1100ms)",
+      "inTx": "translateY(130%)",
+      "outTx": "translateY(130%)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 32,
+      "name": "#33 - Elastic Pop Zoom • Snappy Spring (450ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 33,
+      "name": "#34 - Elastic Pop Zoom • Ultra Fast (280ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 34,
+      "name": "#35 - Elastic Pop Zoom • Cinematic Smooth (650ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 35,
+      "name": "#36 - Elastic Pop Zoom • Heavy Bounce (750ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 36,
+      "name": "#37 - Elastic Pop Zoom • Motion Blur Warp (500ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 37,
+      "name": "#38 - Elastic Pop Zoom • Elastic Overdrive (850ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 38,
+      "name": "#39 - Elastic Pop Zoom • Instant Snap (180ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 39,
+      "name": "#40 - Elastic Pop Zoom • Slow Drift (1100ms)",
+      "inTx": "scale(0.15)",
+      "outTx": "scale(0.1)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 40,
+      "name": "#41 - Hyper Zoom Overdrive • Snappy Spring (450ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 41,
+      "name": "#42 - Hyper Zoom Overdrive • Ultra Fast (280ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 42,
+      "name": "#43 - Hyper Zoom Overdrive • Cinematic Smooth (650ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 43,
+      "name": "#44 - Hyper Zoom Overdrive • Heavy Bounce (750ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 44,
+      "name": "#45 - Hyper Zoom Overdrive • Motion Blur Warp (500ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 45,
+      "name": "#46 - Hyper Zoom Overdrive • Elastic Overdrive (850ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 46,
+      "name": "#47 - Hyper Zoom Overdrive • Instant Snap (180ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 47,
+      "name": "#48 - Hyper Zoom Overdrive • Slow Drift (1100ms)",
+      "inTx": "scale(2.1)",
+      "outTx": "scale(0.05)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 48,
+      "name": "#49 - 3D Flip Horizontal • Snappy Spring (450ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 49,
+      "name": "#50 - 3D Flip Horizontal • Ultra Fast (280ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 50,
+      "name": "#51 - 3D Flip Horizontal • Cinematic Smooth (650ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 51,
+      "name": "#52 - 3D Flip Horizontal • Heavy Bounce (750ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 52,
+      "name": "#53 - 3D Flip Horizontal • Motion Blur Warp (500ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 53,
+      "name": "#54 - 3D Flip Horizontal • Elastic Overdrive (850ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 54,
+      "name": "#55 - 3D Flip Horizontal • Instant Snap (180ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 55,
+      "name": "#56 - 3D Flip Horizontal • Slow Drift (1100ms)",
+      "inTx": "perspective(700px) rotateX(88deg)",
+      "outTx": "perspective(700px) rotateX(-88deg)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 56,
+      "name": "#57 - 3D Flip Vertical • Snappy Spring (450ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 57,
+      "name": "#58 - 3D Flip Vertical • Ultra Fast (280ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 58,
+      "name": "#59 - 3D Flip Vertical • Cinematic Smooth (650ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 59,
+      "name": "#60 - 3D Flip Vertical • Heavy Bounce (750ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 60,
+      "name": "#61 - 3D Flip Vertical • Motion Blur Warp (500ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 61,
+      "name": "#62 - 3D Flip Vertical • Elastic Overdrive (850ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 62,
+      "name": "#63 - 3D Flip Vertical • Instant Snap (180ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 63,
+      "name": "#64 - 3D Flip Vertical • Slow Drift (1100ms)",
+      "inTx": "perspective(700px) rotateY(88deg)",
+      "outTx": "perspective(700px) rotateY(-88deg)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 64,
+      "name": "#65 - Cyber Skew Slash • Snappy Spring (450ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 65,
+      "name": "#66 - Cyber Skew Slash • Ultra Fast (280ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 66,
+      "name": "#67 - Cyber Skew Slash • Cinematic Smooth (650ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 67,
+      "name": "#68 - Cyber Skew Slash • Heavy Bounce (750ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 68,
+      "name": "#69 - Cyber Skew Slash • Motion Blur Warp (500ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 69,
+      "name": "#70 - Cyber Skew Slash • Elastic Overdrive (850ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 70,
+      "name": "#71 - Cyber Skew Slash • Instant Snap (180ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 71,
+      "name": "#72 - Cyber Skew Slash • Slow Drift (1100ms)",
+      "inTx": "skewX(-38deg) translateX(90%)",
+      "outTx": "skewX(38deg) translateX(90%)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 72,
+      "name": "#73 - Vortex Spin-In • Snappy Spring (450ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 73,
+      "name": "#74 - Vortex Spin-In • Ultra Fast (280ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 74,
+      "name": "#75 - Vortex Spin-In • Cinematic Smooth (650ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 75,
+      "name": "#76 - Vortex Spin-In • Heavy Bounce (750ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 76,
+      "name": "#77 - Vortex Spin-In • Motion Blur Warp (500ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 77,
+      "name": "#78 - Vortex Spin-In • Elastic Overdrive (850ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 78,
+      "name": "#79 - Vortex Spin-In • Instant Snap (180ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 79,
+      "name": "#80 - Vortex Spin-In • Slow Drift (1100ms)",
+      "inTx": "rotate(-180deg) scale(0.1)",
+      "outTx": "rotate(180deg) scale(0.1)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 80,
+      "name": "#81 - Spiral Matrix Drop • Snappy Spring (450ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 81,
+      "name": "#82 - Spiral Matrix Drop • Ultra Fast (280ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 82,
+      "name": "#83 - Spiral Matrix Drop • Cinematic Smooth (650ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 83,
+      "name": "#84 - Spiral Matrix Drop • Heavy Bounce (750ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 84,
+      "name": "#85 - Spiral Matrix Drop • Motion Blur Warp (500ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 85,
+      "name": "#86 - Spiral Matrix Drop • Elastic Overdrive (850ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 86,
+      "name": "#87 - Spiral Matrix Drop • Instant Snap (180ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 87,
+      "name": "#88 - Spiral Matrix Drop • Slow Drift (1100ms)",
+      "inTx": "translateY(-90%) rotate(25deg) scale(0.5)",
+      "outTx": "translateY(90%) rotate(-25deg) scale(0.5)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 88,
+      "name": "#89 - Origami Unfold • Snappy Spring (450ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 89,
+      "name": "#90 - Origami Unfold • Ultra Fast (280ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 90,
+      "name": "#91 - Origami Unfold • Cinematic Smooth (650ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 91,
+      "name": "#92 - Origami Unfold • Heavy Bounce (750ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 92,
+      "name": "#93 - Origami Unfold • Motion Blur Warp (500ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 93,
+      "name": "#94 - Origami Unfold • Elastic Overdrive (850ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 94,
+      "name": "#95 - Origami Unfold • Instant Snap (180ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 95,
+      "name": "#96 - Origami Unfold • Slow Drift (1100ms)",
+      "inTx": "perspective(600px) rotateX(-75deg) scaleY(0.2)",
+      "outTx": "perspective(600px) rotateX(75deg) scaleY(0.1)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 96,
+      "name": "#97 - Neon Whip Snap • Snappy Spring (450ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 97,
+      "name": "#98 - Neon Whip Snap • Ultra Fast (280ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 98,
+      "name": "#99 - Neon Whip Snap • Cinematic Smooth (650ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 99,
+      "name": "#100 - Neon Whip Snap • Heavy Bounce (750ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 100,
+      "name": "#101 - Neon Whip Snap • Motion Blur Warp (500ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 101,
+      "name": "#102 - Neon Whip Snap • Elastic Overdrive (850ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 102,
+      "name": "#103 - Neon Whip Snap • Instant Snap (180ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 103,
+      "name": "#104 - Neon Whip Snap • Slow Drift (1100ms)",
+      "inTx": "translateX(80%) skewX(25deg) scale(0.8)",
+      "outTx": "translateX(-80%) skewX(-25deg) scale(0.8)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 104,
+      "name": "#105 - Pendulum Swing • Snappy Spring (450ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 105,
+      "name": "#106 - Pendulum Swing • Ultra Fast (280ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 106,
+      "name": "#107 - Pendulum Swing • Cinematic Smooth (650ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 107,
+      "name": "#108 - Pendulum Swing • Heavy Bounce (750ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 108,
+      "name": "#109 - Pendulum Swing • Motion Blur Warp (500ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 109,
+      "name": "#110 - Pendulum Swing • Elastic Overdrive (850ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 110,
+      "name": "#111 - Pendulum Swing • Instant Snap (180ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 111,
+      "name": "#112 - Pendulum Swing • Slow Drift (1100ms)",
+      "inTx": "rotate(35deg) translateY(-80%)",
+      "outTx": "rotate(-35deg) translateY(80%)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 112,
+      "name": "#113 - Glitch Teleport • Snappy Spring (450ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 113,
+      "name": "#114 - Glitch Teleport • Ultra Fast (280ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 114,
+      "name": "#115 - Glitch Teleport • Cinematic Smooth (650ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 115,
+      "name": "#116 - Glitch Teleport • Heavy Bounce (750ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 116,
+      "name": "#117 - Glitch Teleport • Motion Blur Warp (500ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 117,
+      "name": "#118 - Glitch Teleport • Elastic Overdrive (850ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 118,
+      "name": "#119 - Glitch Teleport • Instant Snap (180ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 119,
+      "name": "#120 - Glitch Teleport • Slow Drift (1100ms)",
+      "inTx": "scaleX(1.8) scaleY(0.05)",
+      "outTx": "scaleX(2.0) scaleY(0.02)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 120,
+      "name": "#121 - Diagonal Meteor • Snappy Spring (450ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 121,
+      "name": "#122 - Diagonal Meteor • Ultra Fast (280ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 122,
+      "name": "#123 - Diagonal Meteor • Cinematic Smooth (650ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 123,
+      "name": "#124 - Diagonal Meteor • Heavy Bounce (750ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 124,
+      "name": "#125 - Diagonal Meteor • Motion Blur Warp (500ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 125,
+      "name": "#126 - Diagonal Meteor • Elastic Overdrive (850ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 126,
+      "name": "#127 - Diagonal Meteor • Instant Snap (180ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 127,
+      "name": "#128 - Diagonal Meteor • Slow Drift (1100ms)",
+      "inTx": "translate(100%, -100%) scale(0.4)",
+      "outTx": "translate(-100%, 100%) scale(0.4)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 128,
+      "name": "#129 - Shutter Expand • Snappy Spring (450ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 129,
+      "name": "#130 - Shutter Expand • Ultra Fast (280ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 130,
+      "name": "#131 - Shutter Expand • Cinematic Smooth (650ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 131,
+      "name": "#132 - Shutter Expand • Heavy Bounce (750ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 132,
+      "name": "#133 - Shutter Expand • Motion Blur Warp (500ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 133,
+      "name": "#134 - Shutter Expand • Elastic Overdrive (850ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 134,
+      "name": "#135 - Shutter Expand • Instant Snap (180ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 135,
+      "name": "#136 - Shutter Expand • Slow Drift (1100ms)",
+      "inTx": "scaleY(0.01)",
+      "outTx": "scaleY(0.01)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 136,
+      "name": "#137 - Bounce Slingshot • Snappy Spring (450ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 137,
+      "name": "#138 - Bounce Slingshot • Ultra Fast (280ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 138,
+      "name": "#139 - Bounce Slingshot • Cinematic Smooth (650ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 139,
+      "name": "#140 - Bounce Slingshot • Heavy Bounce (750ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 140,
+      "name": "#141 - Bounce Slingshot • Motion Blur Warp (500ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 141,
+      "name": "#142 - Bounce Slingshot • Elastic Overdrive (850ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 142,
+      "name": "#143 - Bounce Slingshot • Instant Snap (180ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 143,
+      "name": "#144 - Bounce Slingshot • Slow Drift (1100ms)",
+      "inTx": "translateX(140%) scale(0.6)",
+      "outTx": "translateX(140%) scale(0.6)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 144,
+      "name": "#145 - Warp Gate Collapse • Snappy Spring (450ms)",
+      "inTx": "perspective(800px) rotateY(62deg) scale(0.35)",
+      "outTx": "perspective(800px) rotateY(-62deg) scale(0.3)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 145,
+      "name": "#146 - Warp Gate Collapse • Ultra Fast (280ms)",
+      "inTx": "perspective(800px) rotateY(62deg) scale(0.35)",
+      "outTx": "perspective(800px) rotateY(-62deg) scale(0.3)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 146,
+      "name": "#147 - Warp Gate Collapse • Cinematic Smooth (650ms)",
+      "inTx": "perspective(800px) rotateY(62deg) scale(0.35)",
+      "outTx": "perspective(800px) rotateY(-62deg) scale(0.3)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 147,
+      "name": "#148 - Warp Gate Collapse • Heavy Bounce (750ms)",
+      "inTx": "perspective(800px) rotateY(62deg) scale(0.35)",
+      "outTx": "perspective(800px) rotateY(-62deg) scale(0.3)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 148,
+      "name": "#149 - Warp Gate Collapse • Motion Blur Warp (500ms)",
+      "inTx": "perspective(800px) rotateY(62deg) scale(0.35)",
+      "outTx": "perspective(800px) rotateY(-62deg) scale(0.3)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 149,
+      "name": "#150 - Warp Gate Collapse • Elastic Overdrive (850ms)",
+      "inTx": "perspective(800px) rotateY(62deg) scale(0.35)",
+      "outTx": "perspective(800px) rotateY(-62deg) scale(0.3)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 150,
+      "name": "#151 - Warp Gate Collapse • Instant Snap (180ms)",
+      "inTx": "perspective(800px) rotateY(62deg) scale(0.35)",
+      "outTx": "perspective(800px) rotateY(-62deg) scale(0.3)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 151,
+      "name": "#152 - Warp Gate Collapse • Slow Drift (1100ms)",
+      "inTx": "perspective(800px) rotateY(62deg) scale(0.35)",
+      "outTx": "perspective(800px) rotateY(-62deg) scale(0.3)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 152,
+      "name": "#153 - Depth Punch • Snappy Spring (450ms)",
+      "inTx": "perspective(900px) translateZ(-520px)",
+      "outTx": "perspective(900px) translateZ(420px)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 153,
+      "name": "#154 - Depth Punch • Ultra Fast (280ms)",
+      "inTx": "perspective(900px) translateZ(-520px)",
+      "outTx": "perspective(900px) translateZ(420px)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 154,
+      "name": "#155 - Depth Punch • Cinematic Smooth (650ms)",
+      "inTx": "perspective(900px) translateZ(-520px)",
+      "outTx": "perspective(900px) translateZ(420px)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 155,
+      "name": "#156 - Depth Punch • Heavy Bounce (750ms)",
+      "inTx": "perspective(900px) translateZ(-520px)",
+      "outTx": "perspective(900px) translateZ(420px)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 156,
+      "name": "#157 - Depth Punch • Motion Blur Warp (500ms)",
+      "inTx": "perspective(900px) translateZ(-520px)",
+      "outTx": "perspective(900px) translateZ(420px)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 157,
+      "name": "#158 - Depth Punch • Elastic Overdrive (850ms)",
+      "inTx": "perspective(900px) translateZ(-520px)",
+      "outTx": "perspective(900px) translateZ(420px)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 158,
+      "name": "#159 - Depth Punch • Instant Snap (180ms)",
+      "inTx": "perspective(900px) translateZ(-520px)",
+      "outTx": "perspective(900px) translateZ(420px)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 159,
+      "name": "#160 - Depth Punch • Slow Drift (1100ms)",
+      "inTx": "perspective(900px) translateZ(-520px)",
+      "outTx": "perspective(900px) translateZ(420px)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 160,
+      "name": "#161 - Barrel Roll • Snappy Spring (450ms)",
+      "inTx": "rotate(-360deg) scale(0.2)",
+      "outTx": "rotate(360deg) scale(0.15)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 161,
+      "name": "#162 - Barrel Roll • Ultra Fast (280ms)",
+      "inTx": "rotate(-360deg) scale(0.2)",
+      "outTx": "rotate(360deg) scale(0.15)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 162,
+      "name": "#163 - Barrel Roll • Cinematic Smooth (650ms)",
+      "inTx": "rotate(-360deg) scale(0.2)",
+      "outTx": "rotate(360deg) scale(0.15)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 163,
+      "name": "#164 - Barrel Roll • Heavy Bounce (750ms)",
+      "inTx": "rotate(-360deg) scale(0.2)",
+      "outTx": "rotate(360deg) scale(0.15)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 164,
+      "name": "#165 - Barrel Roll • Motion Blur Warp (500ms)",
+      "inTx": "rotate(-360deg) scale(0.2)",
+      "outTx": "rotate(360deg) scale(0.15)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 165,
+      "name": "#166 - Barrel Roll • Elastic Overdrive (850ms)",
+      "inTx": "rotate(-360deg) scale(0.2)",
+      "outTx": "rotate(360deg) scale(0.15)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 166,
+      "name": "#167 - Barrel Roll • Instant Snap (180ms)",
+      "inTx": "rotate(-360deg) scale(0.2)",
+      "outTx": "rotate(360deg) scale(0.15)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 167,
+      "name": "#168 - Barrel Roll • Slow Drift (1100ms)",
+      "inTx": "rotate(-360deg) scale(0.2)",
+      "outTx": "rotate(360deg) scale(0.15)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 168,
+      "name": "#169 - Accordion Squeeze • Snappy Spring (450ms)",
+      "inTx": "scaleX(0.02)",
+      "outTx": "scaleX(0.02)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 169,
+      "name": "#170 - Accordion Squeeze • Ultra Fast (280ms)",
+      "inTx": "scaleX(0.02)",
+      "outTx": "scaleX(0.02)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 170,
+      "name": "#171 - Accordion Squeeze • Cinematic Smooth (650ms)",
+      "inTx": "scaleX(0.02)",
+      "outTx": "scaleX(0.02)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 171,
+      "name": "#172 - Accordion Squeeze • Heavy Bounce (750ms)",
+      "inTx": "scaleX(0.02)",
+      "outTx": "scaleX(0.02)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 172,
+      "name": "#173 - Accordion Squeeze • Motion Blur Warp (500ms)",
+      "inTx": "scaleX(0.02)",
+      "outTx": "scaleX(0.02)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 173,
+      "name": "#174 - Accordion Squeeze • Elastic Overdrive (850ms)",
+      "inTx": "scaleX(0.02)",
+      "outTx": "scaleX(0.02)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 174,
+      "name": "#175 - Accordion Squeeze • Instant Snap (180ms)",
+      "inTx": "scaleX(0.02)",
+      "outTx": "scaleX(0.02)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 175,
+      "name": "#176 - Accordion Squeeze • Slow Drift (1100ms)",
+      "inTx": "scaleX(0.02)",
+      "outTx": "scaleX(0.02)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 176,
+      "name": "#177 - Card Deal Toss • Snappy Spring (450ms)",
+      "inTx": "translate(130%, -45%) rotate(-24deg)",
+      "outTx": "translate(-130%, 45%) rotate(24deg)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 177,
+      "name": "#178 - Card Deal Toss • Ultra Fast (280ms)",
+      "inTx": "translate(130%, -45%) rotate(-24deg)",
+      "outTx": "translate(-130%, 45%) rotate(24deg)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 178,
+      "name": "#179 - Card Deal Toss • Cinematic Smooth (650ms)",
+      "inTx": "translate(130%, -45%) rotate(-24deg)",
+      "outTx": "translate(-130%, 45%) rotate(24deg)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 179,
+      "name": "#180 - Card Deal Toss • Heavy Bounce (750ms)",
+      "inTx": "translate(130%, -45%) rotate(-24deg)",
+      "outTx": "translate(-130%, 45%) rotate(24deg)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 180,
+      "name": "#181 - Card Deal Toss • Motion Blur Warp (500ms)",
+      "inTx": "translate(130%, -45%) rotate(-24deg)",
+      "outTx": "translate(-130%, 45%) rotate(24deg)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 181,
+      "name": "#182 - Card Deal Toss • Elastic Overdrive (850ms)",
+      "inTx": "translate(130%, -45%) rotate(-24deg)",
+      "outTx": "translate(-130%, 45%) rotate(24deg)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 182,
+      "name": "#183 - Card Deal Toss • Instant Snap (180ms)",
+      "inTx": "translate(130%, -45%) rotate(-24deg)",
+      "outTx": "translate(-130%, 45%) rotate(24deg)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 183,
+      "name": "#184 - Card Deal Toss • Slow Drift (1100ms)",
+      "inTx": "translate(130%, -45%) rotate(-24deg)",
+      "outTx": "translate(-130%, 45%) rotate(24deg)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 184,
+      "name": "#185 - Liquid Stretch Drip • Snappy Spring (450ms)",
+      "inTx": "translateY(-65%) scaleY(1.7) scaleX(0.72)",
+      "outTx": "translateY(65%) scaleY(1.7) scaleX(0.72)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 185,
+      "name": "#186 - Liquid Stretch Drip • Ultra Fast (280ms)",
+      "inTx": "translateY(-65%) scaleY(1.7) scaleX(0.72)",
+      "outTx": "translateY(65%) scaleY(1.7) scaleX(0.72)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 186,
+      "name": "#187 - Liquid Stretch Drip • Cinematic Smooth (650ms)",
+      "inTx": "translateY(-65%) scaleY(1.7) scaleX(0.72)",
+      "outTx": "translateY(65%) scaleY(1.7) scaleX(0.72)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 187,
+      "name": "#188 - Liquid Stretch Drip • Heavy Bounce (750ms)",
+      "inTx": "translateY(-65%) scaleY(1.7) scaleX(0.72)",
+      "outTx": "translateY(65%) scaleY(1.7) scaleX(0.72)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 188,
+      "name": "#189 - Liquid Stretch Drip • Motion Blur Warp (500ms)",
+      "inTx": "translateY(-65%) scaleY(1.7) scaleX(0.72)",
+      "outTx": "translateY(65%) scaleY(1.7) scaleX(0.72)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 189,
+      "name": "#190 - Liquid Stretch Drip • Elastic Overdrive (850ms)",
+      "inTx": "translateY(-65%) scaleY(1.7) scaleX(0.72)",
+      "outTx": "translateY(65%) scaleY(1.7) scaleX(0.72)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 190,
+      "name": "#191 - Liquid Stretch Drip • Instant Snap (180ms)",
+      "inTx": "translateY(-65%) scaleY(1.7) scaleX(0.72)",
+      "outTx": "translateY(65%) scaleY(1.7) scaleX(0.72)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 191,
+      "name": "#192 - Liquid Stretch Drip • Slow Drift (1100ms)",
+      "inTx": "translateY(-65%) scaleY(1.7) scaleX(0.72)",
+      "outTx": "translateY(65%) scaleY(1.7) scaleX(0.72)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 192,
+      "name": "#193 - Hyperspace Streak • Snappy Spring (450ms)",
+      "inTx": "translateX(260%) scaleX(3.2) scaleY(0.4)",
+      "outTx": "translateX(-260%) scaleX(3.2) scaleY(0.4)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 193,
+      "name": "#194 - Hyperspace Streak • Ultra Fast (280ms)",
+      "inTx": "translateX(260%) scaleX(3.2) scaleY(0.4)",
+      "outTx": "translateX(-260%) scaleX(3.2) scaleY(0.4)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 194,
+      "name": "#195 - Hyperspace Streak • Cinematic Smooth (650ms)",
+      "inTx": "translateX(260%) scaleX(3.2) scaleY(0.4)",
+      "outTx": "translateX(-260%) scaleX(3.2) scaleY(0.4)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 195,
+      "name": "#196 - Hyperspace Streak • Heavy Bounce (750ms)",
+      "inTx": "translateX(260%) scaleX(3.2) scaleY(0.4)",
+      "outTx": "translateX(-260%) scaleX(3.2) scaleY(0.4)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 196,
+      "name": "#197 - Hyperspace Streak • Motion Blur Warp (500ms)",
+      "inTx": "translateX(260%) scaleX(3.2) scaleY(0.4)",
+      "outTx": "translateX(-260%) scaleX(3.2) scaleY(0.4)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 197,
+      "name": "#198 - Hyperspace Streak • Elastic Overdrive (850ms)",
+      "inTx": "translateX(260%) scaleX(3.2) scaleY(0.4)",
+      "outTx": "translateX(-260%) scaleX(3.2) scaleY(0.4)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 198,
+      "name": "#199 - Hyperspace Streak • Instant Snap (180ms)",
+      "inTx": "translateX(260%) scaleX(3.2) scaleY(0.4)",
+      "outTx": "translateX(-260%) scaleX(3.2) scaleY(0.4)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 199,
+      "name": "#200 - Hyperspace Streak • Slow Drift (1100ms)",
+      "inTx": "translateX(260%) scaleX(3.2) scaleY(0.4)",
+      "outTx": "translateX(-260%) scaleX(3.2) scaleY(0.4)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 200,
+      "name": "#201 - Tilt-Shift Rise • Snappy Spring (450ms)",
+      "inTx": "perspective(950px) rotateX(46deg) translateY(72%)",
+      "outTx": "perspective(950px) rotateX(-46deg) translateY(-72%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 201,
+      "name": "#202 - Tilt-Shift Rise • Ultra Fast (280ms)",
+      "inTx": "perspective(950px) rotateX(46deg) translateY(72%)",
+      "outTx": "perspective(950px) rotateX(-46deg) translateY(-72%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 202,
+      "name": "#203 - Tilt-Shift Rise • Cinematic Smooth (650ms)",
+      "inTx": "perspective(950px) rotateX(46deg) translateY(72%)",
+      "outTx": "perspective(950px) rotateX(-46deg) translateY(-72%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 203,
+      "name": "#204 - Tilt-Shift Rise • Heavy Bounce (750ms)",
+      "inTx": "perspective(950px) rotateX(46deg) translateY(72%)",
+      "outTx": "perspective(950px) rotateX(-46deg) translateY(-72%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 204,
+      "name": "#205 - Tilt-Shift Rise • Motion Blur Warp (500ms)",
+      "inTx": "perspective(950px) rotateX(46deg) translateY(72%)",
+      "outTx": "perspective(950px) rotateX(-46deg) translateY(-72%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 205,
+      "name": "#206 - Tilt-Shift Rise • Elastic Overdrive (850ms)",
+      "inTx": "perspective(950px) rotateX(46deg) translateY(72%)",
+      "outTx": "perspective(950px) rotateX(-46deg) translateY(-72%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 206,
+      "name": "#207 - Tilt-Shift Rise • Instant Snap (180ms)",
+      "inTx": "perspective(950px) rotateX(46deg) translateY(72%)",
+      "outTx": "perspective(950px) rotateX(-46deg) translateY(-72%)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 207,
+      "name": "#208 - Tilt-Shift Rise • Slow Drift (1100ms)",
+      "inTx": "perspective(950px) rotateX(46deg) translateY(72%)",
+      "outTx": "perspective(950px) rotateX(-46deg) translateY(-72%)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 208,
+      "name": "#209 - Corner Pivot Swing • Snappy Spring (450ms)",
+      "inTx": "rotate(-82deg) scale(0.42) translateX(-30%)",
+      "outTx": "rotate(82deg) scale(0.42) translateX(30%)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 209,
+      "name": "#210 - Corner Pivot Swing • Ultra Fast (280ms)",
+      "inTx": "rotate(-82deg) scale(0.42) translateX(-30%)",
+      "outTx": "rotate(82deg) scale(0.42) translateX(30%)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 210,
+      "name": "#211 - Corner Pivot Swing • Cinematic Smooth (650ms)",
+      "inTx": "rotate(-82deg) scale(0.42) translateX(-30%)",
+      "outTx": "rotate(82deg) scale(0.42) translateX(30%)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 211,
+      "name": "#212 - Corner Pivot Swing • Heavy Bounce (750ms)",
+      "inTx": "rotate(-82deg) scale(0.42) translateX(-30%)",
+      "outTx": "rotate(82deg) scale(0.42) translateX(30%)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 212,
+      "name": "#213 - Corner Pivot Swing • Motion Blur Warp (500ms)",
+      "inTx": "rotate(-82deg) scale(0.42) translateX(-30%)",
+      "outTx": "rotate(82deg) scale(0.42) translateX(30%)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 213,
+      "name": "#214 - Corner Pivot Swing • Elastic Overdrive (850ms)",
+      "inTx": "rotate(-82deg) scale(0.42) translateX(-30%)",
+      "outTx": "rotate(82deg) scale(0.42) translateX(30%)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 214,
+      "name": "#215 - Corner Pivot Swing • Instant Snap (180ms)",
+      "inTx": "rotate(-82deg) scale(0.42) translateX(-30%)",
+      "outTx": "rotate(82deg) scale(0.42) translateX(30%)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 215,
+      "name": "#216 - Corner Pivot Swing • Slow Drift (1100ms)",
+      "inTx": "rotate(-82deg) scale(0.42) translateX(-30%)",
+      "outTx": "rotate(82deg) scale(0.42) translateX(30%)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 216,
+      "name": "#217 - Static Snap Crush • Snappy Spring (450ms)",
+      "inTx": "scaleX(0.35) scaleY(1.55)",
+      "outTx": "scaleX(1.55) scaleY(0.35)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 217,
+      "name": "#218 - Static Snap Crush • Ultra Fast (280ms)",
+      "inTx": "scaleX(0.35) scaleY(1.55)",
+      "outTx": "scaleX(1.55) scaleY(0.35)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 218,
+      "name": "#219 - Static Snap Crush • Cinematic Smooth (650ms)",
+      "inTx": "scaleX(0.35) scaleY(1.55)",
+      "outTx": "scaleX(1.55) scaleY(0.35)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 219,
+      "name": "#220 - Static Snap Crush • Heavy Bounce (750ms)",
+      "inTx": "scaleX(0.35) scaleY(1.55)",
+      "outTx": "scaleX(1.55) scaleY(0.35)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 220,
+      "name": "#221 - Static Snap Crush • Motion Blur Warp (500ms)",
+      "inTx": "scaleX(0.35) scaleY(1.55)",
+      "outTx": "scaleX(1.55) scaleY(0.35)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 221,
+      "name": "#222 - Static Snap Crush • Elastic Overdrive (850ms)",
+      "inTx": "scaleX(0.35) scaleY(1.55)",
+      "outTx": "scaleX(1.55) scaleY(0.35)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 222,
+      "name": "#223 - Static Snap Crush • Instant Snap (180ms)",
+      "inTx": "scaleX(0.35) scaleY(1.55)",
+      "outTx": "scaleX(1.55) scaleY(0.35)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 223,
+      "name": "#224 - Static Snap Crush • Slow Drift (1100ms)",
+      "inTx": "scaleX(0.35) scaleY(1.55)",
+      "outTx": "scaleX(1.55) scaleY(0.35)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 224,
+      "name": "#225 - Rebound Under-Left • Snappy Spring (450ms)",
+      "inTx": "translate(-115%, 115%) rotate(14deg)",
+      "outTx": "translate(-115%, 115%) rotate(-14deg)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 225,
+      "name": "#226 - Rebound Under-Left • Ultra Fast (280ms)",
+      "inTx": "translate(-115%, 115%) rotate(14deg)",
+      "outTx": "translate(-115%, 115%) rotate(-14deg)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 226,
+      "name": "#227 - Rebound Under-Left • Cinematic Smooth (650ms)",
+      "inTx": "translate(-115%, 115%) rotate(14deg)",
+      "outTx": "translate(-115%, 115%) rotate(-14deg)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 227,
+      "name": "#228 - Rebound Under-Left • Heavy Bounce (750ms)",
+      "inTx": "translate(-115%, 115%) rotate(14deg)",
+      "outTx": "translate(-115%, 115%) rotate(-14deg)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 228,
+      "name": "#229 - Rebound Under-Left • Motion Blur Warp (500ms)",
+      "inTx": "translate(-115%, 115%) rotate(14deg)",
+      "outTx": "translate(-115%, 115%) rotate(-14deg)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 229,
+      "name": "#230 - Rebound Under-Left • Elastic Overdrive (850ms)",
+      "inTx": "translate(-115%, 115%) rotate(14deg)",
+      "outTx": "translate(-115%, 115%) rotate(-14deg)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 230,
+      "name": "#231 - Rebound Under-Left • Instant Snap (180ms)",
+      "inTx": "translate(-115%, 115%) rotate(14deg)",
+      "outTx": "translate(-115%, 115%) rotate(-14deg)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 231,
+      "name": "#232 - Rebound Under-Left • Slow Drift (1100ms)",
+      "inTx": "translate(-115%, 115%) rotate(14deg)",
+      "outTx": "translate(-115%, 115%) rotate(-14deg)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    },
+    {
+      "id": 232,
+      "name": "#233 - Comet Over-Right • Snappy Spring (450ms)",
+      "inTx": "translate(115%, -115%) rotate(-14deg) scale(0.55)",
+      "outTx": "translate(115%, -115%) rotate(14deg) scale(0.55)",
+      "dur": 450,
+      "ease": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 233,
+      "name": "#234 - Comet Over-Right • Ultra Fast (280ms)",
+      "inTx": "translate(115%, -115%) rotate(-14deg) scale(0.55)",
+      "outTx": "translate(115%, -115%) rotate(14deg) scale(0.55)",
+      "dur": 280,
+      "ease": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 234,
+      "name": "#235 - Comet Over-Right • Cinematic Smooth (650ms)",
+      "inTx": "translate(115%, -115%) rotate(-14deg) scale(0.55)",
+      "outTx": "translate(115%, -115%) rotate(14deg) scale(0.55)",
+      "dur": 650,
+      "ease": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "blur": "8px"
+    },
+    {
+      "id": 235,
+      "name": "#236 - Comet Over-Right • Heavy Bounce (750ms)",
+      "inTx": "translate(115%, -115%) rotate(-14deg) scale(0.55)",
+      "outTx": "translate(115%, -115%) rotate(14deg) scale(0.55)",
+      "dur": 750,
+      "ease": "cubic-bezier(0.68, -0.55, 0.26, 1.55)",
+      "blur": "0px"
+    },
+    {
+      "id": 236,
+      "name": "#237 - Comet Over-Right • Motion Blur Warp (500ms)",
+      "inTx": "translate(115%, -115%) rotate(-14deg) scale(0.55)",
+      "outTx": "translate(115%, -115%) rotate(14deg) scale(0.55)",
+      "dur": 500,
+      "ease": "cubic-bezier(0.25, 1, 0.5, 1)",
+      "blur": "14px"
+    },
+    {
+      "id": 237,
+      "name": "#238 - Comet Over-Right • Elastic Overdrive (850ms)",
+      "inTx": "translate(115%, -115%) rotate(-14deg) scale(0.55)",
+      "outTx": "translate(115%, -115%) rotate(14deg) scale(0.55)",
+      "dur": 850,
+      "ease": "cubic-bezier(0.34, 1.75, 0.64, 1)",
+      "blur": "6px"
+    },
+    {
+      "id": 238,
+      "name": "#239 - Comet Over-Right • Instant Snap (180ms)",
+      "inTx": "translate(115%, -115%) rotate(-14deg) scale(0.55)",
+      "outTx": "translate(115%, -115%) rotate(14deg) scale(0.55)",
+      "dur": 180,
+      "ease": "cubic-bezier(0.2, 0.9, 0.3, 1)",
+      "blur": "0px"
+    },
+    {
+      "id": 239,
+      "name": "#240 - Comet Over-Right • Slow Drift (1100ms)",
+      "inTx": "translate(115%, -115%) rotate(-14deg) scale(0.55)",
+      "outTx": "translate(115%, -115%) rotate(14deg) scale(0.55)",
+      "dur": 1100,
+      "ease": "cubic-bezier(0.16, 0.9, 0.24, 1)",
+      "blur": "10px"
+    }
+  ],
+  "alertSound": {
+    "id": 40,
+    "name": "#41 - Hologram Bell (F-Lydian Dream)",
+    "baseFreq": 391.1376000000001,
+    "wave": "triangle",
+    "tempo": 0.1,
+    "notes": [
+      1,
+      1.26,
+      1.41,
+      1.5,
+      2
+    ],
+    "modIndex": 6
+  },
+  "timerSound": {
+    "id": 26,
+    "name": "#27 - Arcade Game Over (G-Mixolydian)",
+    "baseFreq": 442.96,
+    "wave": "sawtooth",
+    "tempo": 0.1035,
+    "notes": [
+      2,
+      1.5,
+      1.25,
+      1,
+      1.5,
+      2
+    ],
+    "modIndex": 4
+  },
+  "flexClass": "justify-start items-end",
+  "ambientAlertCls": "amb-glow",
+  "ambientTimerCls": "amb-glow"
+};
+
+    let activeTimers = [];
+    let timerInterval = null;
+    let alertHideTimeout = null;
+    let ws = null;
+    let audioCtx = null;
+
+    const actionSlots = {
+      twitchStart: { name: STATE.config.twitchStartActionName || "", id: STATE.config.twitchStartActionId || "" },
+      twitchEnd:   { name: STATE.config.twitchEndActionName || "",   id: STATE.config.twitchEndActionId || "" },
+      kickStart:   { name: STATE.config.kickStartActionName || "",   id: STATE.config.kickStartActionId || "" },
+      kickEnd:     { name: STATE.config.kickEndActionName || "",     id: STATE.config.kickEndActionId || "" }
+    };
+    const sentChatDedupe = new Set();
+
+    function escapeHtml(str) {
+      return String(str || "").replace(/[&<>"']/g, s =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+    }
+
+    function pickAlertFx() {
+      const pool = STATE.allInOutEffects || [STATE.fx];
+      if (STATE.config.randomEffectOnAlert && pool.length > 0) {
+        return pool[Math.floor(Math.random() * pool.length)] || STATE.fx;
+      }
+      return STATE.fx;
+    }
+
+    function pickTimerFx() {
+      const pool = STATE.allInOutEffects || [STATE.fx];
+      if (STATE.config.randomEffectOnTimer && pool.length > 0) {
+        return pool[Math.floor(Math.random() * pool.length)] || STATE.fx;
+      }
+      return STATE.fx;
+    }
+
+    function addAmbient(el, cls) {
+      if (!el || !cls) return;
+      el.style.transform = "";
+      el.classList.add.apply(el.classList, cls.split(" ").filter(Boolean));
+    }
+    function removeAmbient(el, cls) {
+      if (!el || !cls) return;
+      el.classList.remove.apply(el.classList, cls.split(" ").filter(Boolean));
+    }
+
+    /* ---------------- AUDIO ---------------- */
+    function playSynthSound(preset, customUrl, isTimerEnd) {
+      if (STATE.config.volume <= 0) return;
+      if (customUrl && customUrl.length > 4) {
+        const a = new Audio(customUrl);
+        a.volume = STATE.config.volume;
+        a.play().catch(() => {});
+        return;
+      }
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const now = audioCtx.currentTime;
+        const notes = preset.notes || [1, 1.25, 1.5, 2];
+        const step = preset.tempo || 0.08;
+        notes.forEach((mult, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = preset.wave || "triangle";
+          const startTime = now + idx * step;
+          const dur = step * (isTimerEnd ? 1.8 : 1.5);
+          osc.frequency.setValueAtTime(preset.baseFreq * mult, startTime);
+          gain.gain.setValueAtTime(0.0001, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.25 * STATE.config.volume, startTime + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + dur + 0.02);
+        });
+      } catch (e) {}
+    }
+
+    function playTick() {
+      if (STATE.config.volume <= 0) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "square";
+        osc.frequency.setValueAtTime(1180, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.14 * STATE.config.volume, now + 0.006);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(now); osc.stop(now + 0.1);
+      } catch (e) {}
+    }
+
+    /* ---------------- PARSER (identical to the studio) ---------------- */
+    var TIME_TAG_END_RX = /\(\s*(\d+)\s*:\s*(\d+)(?:\s*:\s*(\d+))?\s*\)\s*$/;
+    var TIME_TAG_ANY_RX = /\(\s*(\d+)\s*:\s*(\d+)(?:\s*:\s*(\d+))?\s*\)/;
+
+    function parseRewardTimerFromDescription(desc, titleFallback) {
+      const combined = ((desc || "") + " " + (titleFallback || "")).trim();
+      if (!combined) return null;
+      const m = (desc && desc.match(TIME_TAG_END_RX))
+             || (desc && desc.match(TIME_TAG_ANY_RX))
+             || combined.match(TIME_TAG_END_RX)
+             || combined.match(TIME_TAG_ANY_RX);
+      if (!m) return null;
+      let h = 0, min = 0, s = 0;
+      if (m[3] !== undefined) { h = parseInt(m[1],10)||0; min = parseInt(m[2],10)||0; s = parseInt(m[3],10)||0; }
+      else { min = parseInt(m[1],10)||0; s = parseInt(m[2],10)||0; }
+      const totalSeconds = h * 3600 + min * 60 + s;
+      if (totalSeconds <= 0) return null;
+      return { totalSeconds: totalSeconds, formattedDuration: formatHumanDuration(totalSeconds) };
+    }
+
+    function stripTag(text) {
+      if (!STATE.config.stripTimeTag) return text || "";
+      return String(text || "").replace(TIME_TAG_END_RX, "").replace(/\s*[-–—]\s*$/, "").trim();
+    }
+
+    function formatHumanDuration(totalSeconds) {
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      const parts = [];
+      if (h > 0) parts.push(h + (h === 1 ? " Hour" : " Hours"));
+      if (m > 0) parts.push(m + (m === 1 ? " Min" : " Mins"));
+      if (s > 0 && h === 0) parts.push(s + (s === 1 ? " Sec" : " Secs"));
+      return parts.length > 0 ? parts.join(" ") : "0 Secs";
+    }
+
+    function formatClockReadout(sec) {
+      const s = Math.max(0, Math.floor(sec));
+      const hrs = Math.floor(s / 3600);
+      const mins = Math.floor((s % 3600) / 60);
+      const secs = s % 60;
+      if (hrs > 0) return hrs + ":" + String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+      return String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+    }
+
+    /* ---------------- CHAT BRIDGE (DoAction — unchanged) ---------------- */
+    function sendChatCallback(platform, messageText, stage, redemptionId, extraVars) {
+      if (!messageText) return;
+      const stageLower = (stage || "start").toLowerCase();
+      const isEnd = stageLower === "end";
+      const isKick = (platform || "twitch").toLowerCase() === "kick";
+      const key = (redemptionId || "msg") + ":" + stageLower;
+
+      const slot = isKick
+        ? (isEnd ? actionSlots.kickEnd : actionSlots.kickStart)
+        : (isEnd ? actionSlots.twitchEnd : actionSlots.twitchStart);
+
+      if (!slot || !slot.name) return;
+      if (redemptionId && sentChatDedupe.has(key)) return;
+      if (redemptionId) sentChatDedupe.add(key);
+
+      const customArgKey = isEnd
+        ? (STATE.config.endArgName || "timerMessage").trim()
+        : (STATE.config.startArgName || "rewardMessage").trim();
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const actionObj = { name: slot.name };
+        if (slot.id) actionObj.id = slot.id;
+        const vars = extraVars || {};
+        const args = {};
+        args[customArgKey] = messageText;
+        args.rewardMessage = messageText;
+        args.timerMessage  = messageText;
+        args.chatMessage   = messageText;
+        args.message       = messageText;
+        args.rawInput      = messageText;
+        args.platform      = platform || "twitch";
+        args.eventPhase    = stageLower;
+        args.user          = vars.user || "";
+        args.reward        = vars.reward || "";
+        args.description   = vars.description || "";
+        args.duration      = vars.duration || "";
+        args.redemptionId  = redemptionId || ("obs_" + Date.now());
+
+        ws.send(JSON.stringify({
+          request: "DoAction",
+          action: actionObj,
+          args: args,
+          id: "obs_chat_" + Date.now()
+        }));
+      }
+    }
+
+    async function resolveAvatar(platform, userLogin, currentAvatar) {
+      if (currentAvatar && currentAvatar.startsWith("http") && !currentAvatar.includes("unavatar.io")) return currentAvatar;
+      if (platform === "twitch" && userLogin) {
+        try {
+          const r = await fetch("https://decapi.me/twitch/avatar/" + encodeURIComponent(userLogin));
+          if (r.ok) {
+            const txt = (await r.text()).trim();
+            if (txt.startsWith("http")) return txt;
+          }
+        } catch (e) {}
+      }
+      return currentAvatar || ("https://unavatar.io/" + platform + "/" + encodeURIComponent(userLogin || "streamer"));
+    }
+
+    async function triggerRewardEvent(payload) {
+      const platform = (payload.platform || "twitch").toLowerCase();
+      const user = payload.user || "Viewer";
+      const userLogin = payload.userLogin || user;
+      const title = payload.title || "Channel Reward";
+      const description = (payload.description || "").trim();
+      const redemptionId = payload.redemptionId || ("obs_red_" + Date.now() + "_" + Math.random().toString(36).slice(2,6));
+      const avatar = await resolveAvatar(platform, userLogin, payload.avatar);
+
+      const timerInfo = payload.durationSeconds
+        ? { totalSeconds: Number(payload.durationSeconds), formattedDuration: payload.humanDuration || formatHumanDuration(Number(payload.durationSeconds)) }
+        : parseRewardTimerFromDescription(description, title);
+
+      playSynthSound(STATE.alertSound, STATE.config.customAlertAudioUrl, false);
+      renderMainAlert({
+        platform: platform, user: user, avatar: avatar, title: title,
+        description: stripTag(description), timerInfo: timerInfo, fx: pickAlertFx()
+      });
+
+      const humanDur = timerInfo ? timerInfo.formattedDuration : "Instant";
+      if (!payload.startChatSent) {
+        let startMsg = STATE.config.startChatTemplate
+          .replace(/\{user\}/gi, user)
+          .replace(/\{reward\}/gi, title)
+          .replace(/\{description\}/gi, description)
+          .replace(/\{duration\}/gi, humanDur);
+        if (!description) startMsg = startMsg.replace(/\s*-\s*$/, "").trim();
+        sendChatCallback(platform, startMsg, "start", redemptionId, {
+          user: user, reward: title, description: description, duration: humanDur
+        });
+      }
+
+      if (timerInfo && timerInfo.totalSeconds > 0) {
+        const tObj = {
+          id: "t_" + Date.now() + "_" + Math.random().toString(36).slice(2,6),
+          redemptionId: redemptionId,
+          platform: platform, user: user, avatar: avatar, title: title, description: description,
+          totalSec: timerInfo.totalSeconds,
+          remainingSec: timerInfo.totalSeconds,
+          durationLabel: timerInfo.formattedDuration,
+          fx: pickTimerFx(),
+          updatedAt: Date.now()
+        };
+        if (STATE.config.moveNewestToTop) activeTimers.unshift(tObj);
+        else activeTimers.push(tObj);
+        renderTimers(tObj.id);
+        startTimerLoop();
+      }
+    }
+
+    /* ---------------- ALERT CARD ---------------- */
+    function renderMainAlert(data) {
+      const slot = document.getElementById("alertPopupSlot");
+      if (alertHideTimeout) clearTimeout(alertHideTimeout);
+
+      const master = STATE.master;
+      const style  = STATE.alertStyle;
+      const fx     = data.fx || STATE.fx;
+      const isKick = data.platform === "kick";
+      const platformColor = isKick ? "#53FC18" : "#9146FF";
+      const platformName  = isKick ? "KICK" : "TWITCH";
+      const platformIcon  = isKick
+        ? '<span class="font-black text-black bg-[#53FC18] px-1.5 py-0.5 rounded text-[10px] leading-none">K</span>'
+        : '<i class="fa-brands fa-twitch text-white bg-[#9146FF] p-1 rounded text-[10px]"></i>';
+
+      const flexDir = master.dir === "col"
+        ? "flex-col items-center text-center"
+        : (master.dir === "row-reverse" ? "flex-row-reverse text-right" : "flex-row text-left");
+      const justify = master.dir === "col" ? "justify-center" : (master.dir === "row-reverse" ? "justify-end" : "justify-start");
+
+      slot.innerHTML = `
+        <div id="liveAlertCard" class="relative overflow-hidden ${master.radius} ${master.pad} ${master.font}"
+             style="background: linear-gradient(135deg, ${style.bg1} 0%, ${style.bg2} 100%);
+                    border: ${style.borderStyle} ${style.accent};
+                    box-shadow: 0 14px 35px -5px ${style.glow}, inset 0 1px 0 rgba(255,255,255,0.15);
+                    color: ${style.text}; --amb-c: ${style.glow};
+                    transform: ${fx.inTx}; opacity: 0; filter: blur(${fx.blur || '0px'});
+                    transition: transform ${fx.dur}ms ${fx.ease}, opacity ${fx.dur}ms ease, filter ${fx.dur}ms ease;">
+          ${style.glass ? '<div class="absolute inset-0 pointer-events-none" style="background:rgba(255,255,255,.045); backdrop-filter: blur(5px);"></div>' : ''}
+          ${style.topBar ? '<div class="absolute top-0 left-0 right-0 h-1.5 ' + (style.runline ? 'fx-runline' : '') + '" style="' + (style.runline
+              ? '--run-a:' + platformColor + '; --run-b:' + style.accent + ';'
+              : 'background: linear-gradient(90deg, ' + platformColor + ', ' + style.accent + ', ' + platformColor + ');') + '"></div>' : ''}
+          ${(!style.topBar && style.runline) ? '<div class="absolute left-0 top-0 bottom-0 w-1 fx-runline" style="--run-a:' + platformColor + '; --run-b:' + style.accent + ';"></div>' : ''}
+          ${style.scanline ? '<div class="absolute inset-0 pointer-events-none opacity-15" style="background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.18) 3px);"></div>' : ''}
+
+          <div class="flex ${flexDir} gap-3.5 items-center relative z-10">
+            <div class="relative shrink-0">
+              <img src="${escapeHtml(data.avatar)}"
+                   onerror="this.src='https://placehold.co/120x120/1e293b/ffffff?text=USER'"
+                   class="${master.avatarSize} ${master.avatarClip} ${master.avatarRing} object-cover shadow-lg"
+                   style="border: 2px solid ${style.accent};" />
+              <div class="absolute -bottom-1 -right-1 shadow-md">${platformIcon}</div>
+            </div>
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5 flex-wrap ${justify} mb-1">
+                ${STATE.config.showPlatformBadge !== false ? '<span class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full" style="background: ' + style.accent + '25; color: ' + style.accent + '; border: 1px solid ' + style.accent + '60;">' + platformName + ' REWARD</span>' : ''}
+                <span class="text-xs font-bold truncate" style="color: ${style.sub};">
+                  <i class="fa-solid fa-user-check text-[10px] mr-1 opacity-75"></i>${escapeHtml(data.user)}
+                </span>
+                ${data.timerInfo ? '<span class="text-[10px] font-mono-tech font-bold px-2 py-0.5 rounded bg-black/40 border border-white/15" style="color:' + style.accent + ';"><i class="fa-regular fa-clock mr-1"></i>' + formatClockReadout(data.timerInfo.totalSeconds) + '</span>' : ''}
+              </div>
+
+              <h3 class="text-base sm:text-lg font-black tracking-tight leading-snug break-words" style="color: ${style.text};">
+                ${escapeHtml(data.title)}
+              </h3>
+
+              ${(STATE.config.showDescription !== false && data.description)
+                ? '<p class="text-xs sm:text-[13px] mt-1 leading-relaxed break-words opacity-95" style="color: ' + style.sub + ';">' + escapeHtml(data.description) + '</p>'
+                : ''}
+            </div>
+          </div>
+
+          ${STATE.config.showAlertHoldBar !== false ? `
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-black/40 overflow-hidden">
+              <div id="liveAlertHoldBar" class="h-full w-full" style="background: ${style.accent}; transform-origin: left center; transform: scaleX(1);"></div>
+            </div>` : ''}
+        </div>`;
+
+      const holdMs = Math.max(0.5, Number(STATE.config.alertHoldSec) || 6) * 1000;
+      const ambCls = STATE.ambientAlertCls || "";
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const c = document.getElementById("liveAlertCard");
+        if (c) { c.style.transform = "translate(0,0) scale(1) rotate(0deg) skew(0deg)"; c.style.opacity = "1"; c.style.filter = "blur(0px)"; }
+        const hb = document.getElementById("liveAlertHoldBar");
+        if (hb) { hb.style.transition = "transform " + holdMs + "ms linear"; hb.style.transform = "scaleX(0)"; }
+      }));
+
+      if (ambCls) {
+        setTimeout(() => addAmbient(document.getElementById("liveAlertCard"), ambCls), fx.dur + 60);
+      }
+
+      alertHideTimeout = setTimeout(() => {
+        const c = document.getElementById("liveAlertCard");
+        if (c) {
+          removeAmbient(c, ambCls);
+          c.style.transition = "transform " + fx.dur + "ms " + fx.ease + ", opacity " + fx.dur + "ms ease, filter " + fx.dur + "ms ease";
+          c.style.transform = fx.outTx;
+          c.style.opacity = "0";
+          c.style.filter = "blur(" + (fx.blur || "0px") + ")";
+          setTimeout(() => { slot.innerHTML = ""; }, fx.dur + 50);
+        }
+      }, holdMs);
+    }
+
+    /* ---------------- TIMER CARD ---------------- */
+    function buildTimerCardHTML(t, entryStyle, topPinned) {
+      const master = STATE.master;
+      const s = STATE.timerStyle;
+      const cfg = STATE.config;
+
+      const pct = Math.max(0, Math.min(100, (t.remainingSec / t.totalSec) * 100));
+      const clockStr = formatClockReadout(t.remainingSec);
+      const isKick = t.platform === "kick";
+      const urgent = cfg.urgentPulse !== false && (cfg.urgentSec || 0) > 0 && t.remainingSec <= cfg.urgentSec;
+      const showUser = cfg.showTimerUser !== false;
+      const showBar  = cfg.showTimerBar !== false;
+
+      const platBadge = isKick
+        ? '<span class="px-1.5 py-0.5 rounded bg-[#53FC18] text-black font-black text-[9px] leading-none">KICK</span>'
+        : '<span class="px-1.5 py-0.5 rounded bg-[#9146FF] text-white font-bold text-[9px] leading-none">TWITCH</span>';
+
+      const avatarImg = '<img src="' + escapeHtml(t.avatar) + '" onerror="this.src=\'https://placehold.co/80x80/1e293b/ffffff?text=U\'"'
+        + ' class="w-10 h-10 ' + master.avatarClip + ' object-cover shrink-0" style="border: 1.5px solid ' + s.accent + ';" />';
+
+      const topChip = topPinned
+        ? '<span class="text-[9px] px-1.5 py-px rounded font-mono-tech" style="background:' + s.accent + '22;color:' + s.accent + ';border:1px solid ' + s.accent + '55;">TOP</span>'
+        : '';
+
+      const userLine = showUser
+        ? '<div class="flex items-center gap-1.5">' + platBadge
+          + '<span class="text-[11px] font-bold truncate" style="color:' + s.sub + ';">' + escapeHtml(t.user) + '</span>'
+          + topChip + '</div>'
+        : (topChip ? '<div>' + topChip + '</div>' : '');
+
+      function progressBar(segmented) {
+        if (!showBar) return '';
+        const fill = segmented
+          ? 'repeating-linear-gradient(90deg, ' + s.accent + ', ' + s.accent + ' 6px, transparent 6px, transparent 9px)'
+          : 'linear-gradient(90deg, ' + s.accent + ', #ffffff)';
+        return '<div class="w-full h-2 bg-black/50 rounded-full overflow-hidden mt-2.5 p-0.5 border border-white/10">'
+          + '<div id="timer-bar-' + t.id + '" class="h-full rounded-full transition-all duration-500" style="width: ' + pct + '%; background: ' + fill + ';"></div></div>';
+      }
+
+      const urgentVeil = urgent
+        ? '<div class="urgent-veil absolute inset-0 pointer-events-none" style="background:' + s.accent + ';opacity:.2;"></div>'
+        : '';
+
+      function clockBox(size) {
+        return '<div id="timer-clock-' + t.id + '" class="font-mono-tech ' + size
+          + ' font-black px-2.5 py-1 rounded-lg bg-black/45 border border-white/10 tracking-wider shrink-0" style="color:'
+          + s.accent + ';">' + clockStr + '</div>';
+      }
+
+      function wrapOpen(extraClass, extraStyle) {
+        return '<div id="timer-card-' + t.id + '" class="timer-stack-item relative overflow-hidden ' + master.font + ' '
+          + (urgent ? 'timer-urgent ' : '') + extraClass + '" style="--amb-c:' + s.glow + '; color:' + s.text + '; '
+          + extraStyle + ' ' + entryStyle + '">';
+      }
+
+      if (s.archetype === "circular-ring") {
+        const dashOffset = 125.6 - (125.6 * pct) / 100;
+        return wrapOpen(master.radius + ' p-3',
+          'background: linear-gradient(135deg, ' + s.bg1 + 'f2, ' + s.bg2 + 'f2); border: 1.5px solid ' + s.accent + '; box-shadow: 0 8px 24px ' + s.glow + ';')
+          + urgentVeil
+          + '<div class="flex items-center gap-3 relative z-10">'
+          +   '<div class="relative w-12 h-12 grid place-items-center shrink-0">'
+          +     '<svg class="w-12 h-12 -rotate-90" viewBox="0 0 48 48">'
+          +       '<circle cx="24" cy="24" r="20" stroke="rgba(255,255,255,0.15)" stroke-width="4" fill="none" />'
+          +       '<circle id="timer-ring-' + t.id + '" cx="24" cy="24" r="20" stroke="' + s.accent + '" stroke-width="4" fill="none" stroke-dasharray="125.6" stroke-dashoffset="' + dashOffset + '" stroke-linecap="round" />'
+          +     '</svg>'
+          +     '<img src="' + escapeHtml(t.avatar) + '" class="w-8 h-8 rounded-full object-cover absolute" />'
+          +   '</div>'
+          +   '<div class="flex-1 min-w-0">' + userLine + '<div class="text-sm font-extrabold truncate">' + escapeHtml(t.title) + '</div></div>'
+          +   clockBox('text-lg')
+          + '</div></div>';
+      }
+
+      if (s.archetype === "compact-pill") {
+        return wrapOpen('rounded-full px-4 py-2.5',
+          'background: linear-gradient(90deg, ' + s.bg1 + ', ' + s.bg2 + '); border: 2px solid ' + s.accent + '; box-shadow: 0 6px 20px ' + s.glow + ';')
+          + urgentVeil
+          + '<div class="flex items-center justify-between gap-3 relative z-10">'
+          +   '<div class="flex items-center gap-2.5 min-w-0">'
+          +     (showUser ? '<img src="' + escapeHtml(t.avatar) + '" class="w-8 h-8 rounded-full object-cover border border-white/30 shrink-0" />' : '')
+          +     '<div class="min-w-0"><div class="text-xs font-extrabold truncate">' + escapeHtml(t.title) + '</div>'
+          +     (showUser ? '<div class="text-[10px] truncate" style="color:' + s.sub + ';">' + escapeHtml(t.user) + '</div>' : '')
+          +     '</div>'
+          +   '</div>'
+          +   '<div id="timer-clock-' + t.id + '" class="font-mono-tech text-base font-black px-3 py-0.5 rounded-full bg-black/50 shrink-0" style="color:' + s.accent + ';">' + clockStr + '</div>'
+          + '</div>'
+          + (showBar ? '<div id="timer-bar-' + t.id + '" class="absolute bottom-0 left-0 h-1 transition-all duration-500" style="width:' + pct + '%; background:' + s.accent + ';"></div>' : '')
+          + '</div>';
+      }
+
+      if (s.archetype === "side-rail") {
+        return wrapOpen(master.radius + ' pl-0 pr-3.5 py-3',
+          'background: linear-gradient(135deg, ' + s.bg1 + 'f5, ' + s.bg2 + 'f5); border: 1px solid ' + s.accent + '55; box-shadow: 0 8px 22px ' + s.glow + ';')
+          + urgentVeil
+          + '<div class="flex items-stretch gap-3 relative z-10">'
+          +   '<div class="w-1.5 rounded-r-full shrink-0" style="background:' + s.accent + '; box-shadow: 0 0 12px ' + s.glow + ';"></div>'
+          +   '<div class="flex-1 min-w-0 flex items-center gap-3">'
+          +     (showUser ? avatarImg : '')
+          +     '<div class="flex-1 min-w-0">' + userLine
+          +       '<div class="text-sm font-extrabold truncate mt-0.5">' + escapeHtml(t.title) + '</div>'
+          +       progressBar(false)
+          +     '</div>'
+          +     clockBox('text-lg')
+          +   '</div>'
+          + '</div></div>';
+      }
+
+      if (s.archetype === "minimal-text") {
+        return wrapOpen('px-1 py-1.5', 'background: transparent;')
+          + '<div class="flex items-center justify-between gap-3 relative z-10" style="text-shadow: 0 2px 10px rgba(0,0,0,.95), 0 0 22px ' + s.glow + ';">'
+          +   '<div class="min-w-0"><div class="text-sm font-extrabold truncate" style="color:' + s.text + ';">' + escapeHtml(t.title) + '</div>'
+          +   (showUser ? '<div class="text-[10px] truncate" style="color:' + s.sub + ';">' + escapeHtml(t.user) + '</div>' : '') + '</div>'
+          +   '<div id="timer-clock-' + t.id + '" class="font-mono-tech text-xl font-black tracking-wider shrink-0" style="color:' + s.accent + ';">' + clockStr + '</div>'
+          + '</div>'
+          + (showBar ? '<div class="w-full h-0.5 mt-1.5 rounded-full overflow-hidden" style="background:rgba(255,255,255,.14);"><div id="timer-bar-' + t.id + '" class="h-full transition-all duration-500" style="width:' + pct + '%; background:' + s.accent + ';"></div></div>' : '')
+          + '</div>';
+      }
+
+      if (s.archetype === "badge-block") {
+        return wrapOpen(master.radius + ' p-3',
+          'background: linear-gradient(160deg, ' + s.bg1 + 'f7, ' + s.bg2 + 'f7); border: 1.5px solid ' + s.accent + '; box-shadow: 0 10px 26px ' + s.glow + ';')
+          + urgentVeil
+          + '<div class="relative z-10">'
+          +   '<div class="flex items-center gap-2 mb-2">'
+          +     (showUser ? '<img src="' + escapeHtml(t.avatar) + '" class="w-7 h-7 ' + master.avatarClip + ' object-cover shrink-0" style="border:1.5px solid ' + s.accent + ';" />' : '')
+          +     '<div class="flex-1 min-w-0"><div class="text-[13px] font-extrabold truncate">' + escapeHtml(t.title) + '</div>'
+          +     (showUser ? '<div class="text-[10px] truncate" style="color:' + s.sub + ';">' + escapeHtml(t.user) + '</div>' : '') + '</div>'
+          +     topChip
+          +   '</div>'
+          +   '<div id="timer-clock-' + t.id + '" class="font-mono-tech text-2xl font-black text-center py-1.5 rounded-lg bg-black/45 border border-white/10 tracking-widest" style="color:' + s.accent + ';">' + clockStr + '</div>'
+          +   progressBar(false)
+          + '</div></div>';
+      }
+
+      if (s.archetype === "glass-capsule") {
+        return wrapOpen('rounded-2xl p-3.5',
+          'background: ' + s.bg2 + '66; backdrop-filter: blur(11px); border: 1px solid ' + s.accent + '77; box-shadow: 0 8px 28px ' + s.glow + ', inset 0 1px 0 rgba(255,255,255,.14);')
+          + urgentVeil
+          + '<div class="flex items-center justify-between gap-3 relative z-10">'
+          +   '<div class="flex items-center gap-2.5 min-w-0">' + (showUser ? avatarImg : '')
+          +     '<div class="min-w-0">' + userLine + '<div class="text-sm font-extrabold truncate mt-0.5">' + escapeHtml(t.title) + '</div></div>'
+          +   '</div>'
+          +   clockBox('text-lg')
+          + '</div>' + progressBar(false) + '</div>';
+      }
+
+      if (s.archetype === "arcade-7seg") {
+        return wrapOpen('rounded-md p-3',
+          'background: ' + s.bg1 + '; border: 2px solid ' + s.accent + '; box-shadow: 0 0 0 2px ' + s.bg2 + ', 0 8px 22px ' + s.glow + ';')
+          + urgentVeil
+          + '<div class="flex items-center justify-between gap-3 relative z-10">'
+          +   '<div class="min-w-0">' + userLine + '<div class="text-[11px] font-arcade truncate mt-1" style="color:' + s.text + ';">' + escapeHtml(t.title) + '</div></div>'
+          +   '<div id="timer-clock-' + t.id + '" class="font-arcade text-sm px-2 py-1.5 rounded shrink-0" style="color:' + s.accent + '; background:#000; border:1px solid ' + s.accent + '55; text-shadow: 0 0 9px ' + s.accent + ';">' + clockStr + '</div>'
+          + '</div>' + progressBar(true) + '</div>';
+      }
+
+      const isSegmented = s.archetype === "segmented-led";
+      const isSplit     = s.archetype === "dual-split";
+      const isHolo      = s.archetype === "holo-strip";
+      const bg = isSplit
+        ? 'linear-gradient(90deg, ' + s.bg1 + ' 0%, ' + s.bg1 + ' 52%, ' + s.bg2 + ' 52%, ' + s.bg2 + ' 100%)'
+        : 'linear-gradient(135deg, ' + s.bg1 + 'f5, ' + s.bg2 + 'f5)';
+
+      return wrapOpen(master.radius + ' p-3.5',
+        'background: ' + bg + '; border: 1.5px solid ' + s.accent + '; box-shadow: 0 8px 25px ' + s.glow + ';')
+        + urgentVeil
+        + (isHolo ? '<div class="absolute bottom-0 left-0 right-0 h-1 fx-runline" style="--run-a:' + s.accent + '; --run-b:' + s.sub + ';"></div>' : '')
+        + '<div class="flex items-center justify-between gap-3 relative z-10">'
+        +   '<div class="flex items-center gap-2.5 min-w-0">' + (showUser ? avatarImg : '')
+        +     '<div class="min-w-0">' + userLine
+        +       '<div class="text-xs sm:text-sm font-extrabold truncate mt-0.5" style="color:' + s.text + ';">' + escapeHtml(t.title) + '</div>'
+        +     '</div>'
+        +   '</div>'
+        +   clockBox('text-base sm:text-lg')
+        + '</div>' + progressBar(isSegmented) + '</div>';
+    }
+
+    function renderTimers(newlyAddedId) {
+      const container = document.getElementById("activeTimersStack");
+      if (STATE.config.moveNewestToTop) activeTimers.sort((a, b) => b.updatedAt - a.updatedAt);
+
+      const cap = Math.max(1, Number(STATE.config.maxVisibleTimers) || 6);
+      const visible = activeTimers.slice(0, cap);
+      const hidden = activeTimers.length - visible.length;
+
+      container.innerHTML = visible.map((t, index) => {
+        const fx = t.fx || STATE.fx;
+        const entryStyle = (t.id === newlyAddedId)
+          ? 'transform: ' + fx.inTx + '; opacity: 0; filter: blur(' + (fx.blur || '0px') + '); transition: transform ' + fx.dur + 'ms ' + fx.ease + ', opacity ' + fx.dur + 'ms ease, filter ' + fx.dur + 'ms ease;'
+          : 'transform: translate(0,0) scale(1); opacity: 1; filter: blur(0px);';
+        return buildTimerCardHTML(t, entryStyle, index === 0 && visible.length > 1 && STATE.config.moveNewestToTop);
+      }).join("");
+
+      const overflow = document.getElementById("timerOverflowSlot");
+      if (overflow) {
+        const s = STATE.timerStyle;
+        overflow.innerHTML = hidden > 0
+          ? '<div class="self-end px-2.5 py-1 rounded-full text-[10px] font-mono-tech font-bold" style="background:' + s.bg2 + 'dd;border:1px solid ' + s.accent + '66;color:' + s.accent + ';">+' + hidden + ' more running</div>'
+          : '';
+      }
+
+      const ambCls = STATE.ambientTimerCls || "";
+
+      if (newlyAddedId) {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const el = document.getElementById("timer-card-" + newlyAddedId);
+          if (el) { el.style.transform = "translate(0,0) scale(1) rotate(0deg) skew(0deg)"; el.style.opacity = "1"; el.style.filter = "blur(0px)"; }
+        }));
+        if (ambCls) {
+          const added = activeTimers.filter(x => x.id === newlyAddedId)[0];
+          const dur = (added && added.fx && added.fx.dur) || 450;
+          setTimeout(() => addAmbient(document.getElementById("timer-card-" + newlyAddedId), ambCls), dur + 70);
+        }
+      }
+
+      if (ambCls) {
+        visible.forEach(t => {
+          if (t.id === newlyAddedId) return;
+          addAmbient(document.getElementById("timer-card-" + t.id), ambCls);
+        });
+      }
+    }
+
+    function startTimerLoop() {
+      if (timerInterval) return;
+      timerInterval = setInterval(() => {
+        if (activeTimers.length === 0) { clearInterval(timerInterval); timerInterval = null; return; }
+        const done = [];
+        activeTimers.forEach(t => {
+          if (t.completing) return;
+          t.remainingSec = Math.max(0, t.remainingSec - 1);
+
+          const cEl = document.getElementById("timer-clock-" + t.id);
+          if (cEl) cEl.textContent = formatClockReadout(t.remainingSec);
+
+          const pct = Math.max(0, Math.min(100, (t.remainingSec / t.totalSec) * 100));
+          const bEl = document.getElementById("timer-bar-" + t.id);
+          if (bEl) bEl.style.width = pct + "%";
+          const rEl = document.getElementById("timer-ring-" + t.id);
+          if (rEl) rEl.setAttribute("stroke-dashoffset", String(125.6 - (125.6 * pct) / 100));
+
+          const card = document.getElementById("timer-card-" + t.id);
+          if (card && STATE.config.urgentPulse !== false && (STATE.config.urgentSec || 0) > 0
+              && t.remainingSec <= STATE.config.urgentSec && t.remainingSec > 0
+              && !card.classList.contains("timer-urgent")) {
+            card.classList.add("timer-urgent");
+            if (!card.querySelector(".urgent-veil")) {
+              const veil = document.createElement("div");
+              veil.className = "urgent-veil absolute inset-0 pointer-events-none";
+              veil.style.background = STATE.timerStyle.accent;
+              veil.style.opacity = ".2";
+              card.prepend(veil);
+            }
+          }
+
+          if (STATE.config.tickCountdown && t.remainingSec > 0 && t.remainingSec <= 3) playTick();
+          if (t.remainingSec <= 0) { t.completing = true; done.push(t); }
+        });
+
+        done.forEach(d => {
+          playSynthSound(STATE.timerSound, STATE.config.customTimerAudioUrl, true);
+          const endMsg = STATE.config.endChatTemplate
+            .replace(/\{user\}/gi, d.user)
+            .replace(/\{reward\}/gi, d.title)
+            .replace(/\{description\}/gi, d.description)
+            .replace(/\{duration\}/gi, d.durationLabel);
+          sendChatCallback(d.platform, endMsg, "end", d.redemptionId, {
+            user: d.user, reward: d.title, description: d.description, duration: d.durationLabel
+          });
+
+          const el = document.getElementById("timer-card-" + d.id);
+          const fx = d.fx || STATE.fx;
+          if (el) {
+            removeAmbient(el, STATE.ambientTimerCls || "");
+            el.classList.remove("timer-urgent");
+            el.style.transition = "transform " + fx.dur + "ms " + fx.ease + ", opacity " + fx.dur + "ms ease, filter " + fx.dur + "ms ease";
+            el.style.transform = fx.outTx;
+            el.style.opacity = "0";
+            el.style.filter = "blur(" + (fx.blur || "0px") + ")";
+          }
+          setTimeout(() => {
+            activeTimers = activeTimers.filter(x => x.id !== d.id);
+            renderTimers();
+          }, (fx.dur || 400) + 40);
+        });
+      }, 1000);
+    }
+
+    /* ---------------- STREAMER.BOT WEBSOCKET (unchanged) ---------------- */
+    function connectOBSWebSocket() {
+      ws = new WebSocket(STATE.config.wsUrl || "ws://127.0.0.1:8080/");
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          request: "Subscribe",
+          id: "obs_reward_overlay",
+          events: { Twitch: ["RewardRedemption"], Kick: ["RewardRedemption"], General: ["Custom"] }
+        }));
+        ws.send(JSON.stringify({ request: "GetActions", id: "fetch-actions" }));
+      };
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.id === "fetch-actions" || Array.isArray(msg.actions)) {
+            const list = Array.isArray(msg.actions) ? msg.actions : [];
+            Object.keys(actionSlots).forEach(k => {
+              const targetName = (actionSlots[k].name || "").toLowerCase();
+              if (!targetName) return;
+              const match = list.find(a => (a.name || "").toLowerCase() === targetName);
+              if (match) { actionSlots[k].id = match.id; actionSlots[k].name = match.name; }
+            });
+            return;
+          }
+          if (!msg.event || !msg.data) return;
+          const d = msg.data;
+          const customPayload = (d.overlayType === "channelRewardAlert" || d.eventName === "RewardStudio.Redemption")
+            ? d
+            : ((d.data && (d.data.overlayType === "channelRewardAlert" || d.data.eventName === "RewardStudio.Redemption")) ? d.data : null);
+
+          if (customPayload) { triggerRewardEvent(customPayload); return; }
+
+          if ((msg.event.type || "").toLowerCase() === "rewardredemption") {
+            const red = d.redemption || d;
+            const reward = red.reward || d.reward || {};
+            const uObj = red.user || d.user || {};
+            const platform = (msg.event.source || "").toLowerCase().indexOf("kick") >= 0 ? "kick" : "twitch";
+            const user = red.user_name || d.user_name || uObj.display_name || uObj.name || uObj.username || "Viewer";
+            const userLogin = red.user_login || d.user_login || uObj.login || user;
+            const rawPrompt = reward.prompt || reward.description || d.prompt || d.rewardPrompt || "";
+            const userInput = red.user_input || d.user_input || d.rawInput || d.message || "";
+            const fullDesc = [rawPrompt, (userInput && userInput !== rawPrompt) ? userInput : ""].filter(Boolean).join(" - ");
+            triggerRewardEvent({
+              redemptionId: red.id || d.id || ("nat_" + Date.now()),
+              platform: platform,
+              user: user,
+              userLogin: userLogin,
+              avatar: d.user_avatar || uObj.profile_image_url || "",
+              title: reward.title || d.reward_title || "Channel Reward",
+              description: fullDesc,
+              startChatSent: false
+            });
+          }
+        } catch (err) {}
+      };
+      ws.onclose = () => setTimeout(connectOBSWebSocket, 4000);
+    }
+
+    window.addEventListener("load", () => { connectOBSWebSocket(); });
+  </script>
+</body>
+</html>
