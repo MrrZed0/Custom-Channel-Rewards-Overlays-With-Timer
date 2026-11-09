@@ -1,1 +1,0 @@
-Add (5:00) end of channel reward description to enable timer
