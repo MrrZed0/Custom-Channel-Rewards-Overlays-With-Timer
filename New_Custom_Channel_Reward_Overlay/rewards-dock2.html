@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Streamer.bot OBS Reward Dock Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: #1e293b #090d14;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #070a10;
+      color: #f8fafc;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    .font-mono-tech {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Running Timer Idle Effect on Active Green Bubbles */
+    @keyframes dockIdleBreath {
+      0%, 100% {
+        transform: translateY(0px) scale(1);
+        box-shadow: 0 4px 14px -2px rgba(16, 185, 129, 0.32),
+                    0 0 0 1px rgba(52, 211, 153, 0.5),
+                    inset 0 1px 1px rgba(255, 255, 255, 0.18);
+      }
+      50% {
+        transform: translateY(-1.5px) scale(1.005);
+        box-shadow: 0 8px 20px -2px rgba(16, 185, 129, 0.58),
+                    0 0 14px 2px rgba(52, 211, 153, 0.38),
+                    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+      }
+    }
+
+    @keyframes dockIdleWave {
+      0% { transform: translateX(-120%) skewX(-20deg); }
+      100% { transform: translateX(240%) skewX(-20deg); }
+    }
+
+    @keyframes dockSlideInTop {
+      0% {
+        opacity: 0;
+        transform: translateY(-12px) scale(0.98);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* ACTIVE GREEN BUBBLE */
+    .dock-bubble-green {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(16, 185, 129, 0.35), transparent 62%),
+        linear-gradient(135deg, #052e22 0%, #064e3b 55%, #03261f 100%);
+      border: 1.5px solid #34d399;
+      box-shadow: 0 4px 14px -3px rgba(16, 185, 129, 0.35),
+                  inset 0 1px 1px rgba(255, 255, 255, 0.18);
+    }
+
+    /* IDLE EFFECT FOR TIMED REWARDS WHILE TIMER IS RUNNING */
+    .dock-bubble-green-idle {
+      animation: dockIdleBreath 2.5s ease-in-out infinite;
+    }
+
+    .dock-idle-shimmer::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 45%;
+      background: linear-gradient(90deg, transparent, rgba(167, 243, 208, 0.18), transparent);
+      animation: dockIdleWave 3.1s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    /* DEACTIVATED RED BUBBLE */
+    .dock-bubble-red {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(244, 63, 94, 0.28), transparent 62%),
+        linear-gradient(135deg, #3b0712 0%, #4c0519 55%, #26060d 100%);
+      border: 1.5px solid #fb7185;
+      box-shadow: 0 4px 12px -3px rgba(244, 63, 94, 0.3),
+                  inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    }
+
+    .dock-item-enter {
+      animation: dockSlideInTop 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col select-none overflow-hidden">
+
+  <!-- TOP DOCK HEADER -->
+  <header class="bg-[#0c111b] border-b border-slate-800/90 px-2.5 py-2 shrink-0 z-30 space-y-1.5">
+    
+    <!-- Row 1: Title, WS Status & Quick Settings Toggle -->
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20 border border-emerald-300/30 shrink-0">
+          <i class="fa-solid fa-bolt text-white text-sm"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <h1 class="font-black text-xs sm:text-sm tracking-wider uppercase text-white truncate">OBS REWARD DOCK</h1>
+            <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">120s Hold</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
+            <span id="wsDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+            <span id="wsStatusText" class="truncate font-mono text-[10px]">WS: Standby (127.0.0.1:8080)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Header Buttons -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button onclick="toggleSettingsDrawer()" id="settingsBtn" class="px-2.5 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition" title="Configure Streamer.bot WebSocket & Test Rewards">
+          <i class="fa-solid fa-sliders text-emerald-400"></i>
+          <span class="hidden sm:inline">Settings / Test</span>
+        </button>
+        <button onclick="downloadStandaloneDockFile()" class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/25 border border-emerald-300/30 transition" title="Download this Dock HTML file for OBS Custom Browser Docks">
+          <i class="fa-solid fa-download"></i>
+          <span class="hidden md:inline">Save Dock HTML</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Row 2: Active (Green) & Deactivated (Red) Counters + Quick Actions -->
+    <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80 flex-wrap">
+      <div class="flex items-center gap-2">
+        <!-- Green Active Counter -->
+        <span class="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-xs font-black flex items-center gap-1.5 shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span id="dockGreenCounter">0 Active</span>
+        </span>
+        <!-- Red Deactivated Counter -->
+        <span class="px-2.5 py-1 rounded-full bg-rose-500/20 border border-rose-400/50 text-rose-300 text-xs font-black flex items-center gap-1.5 shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+          <span id="dockRedCounter">0 Not Active</span>
+        </span>
+      </div>
+
+      <!-- Quick Test & Bulk Action Buttons -->
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <button onclick="triggerTestReward('instant')" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 text-[11px] font-bold flex items-center gap-1 transition" title="Simulate a reward without a timer (stays green for 120s then turns red)">
+          <i class="fa-solid fa-plus text-emerald-400 text-[10px]"></i>
+          <span>+120s Alert</span>
+        </button>
+        <button onclick="triggerTestReward('timed')" class="px-2.5 py-1 rounded-lg bg-teal-500/15 hover:bg-teal-500/30 border border-teal-500/40 text-teal-200 text-[11px] font-bold flex items-center gap-1 transition" title="Simulate a reward with a countdown timer and Idle Effect">
+          <i class="fa-solid fa-stopwatch text-teal-300 text-[10px]"></i>
+          <span>+Timer Alert</span>
+        </button>
+        <button onclick="dismissAllGreenRewards()" class="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-[11px] font-bold transition" title="Dismiss all active green rewards and turn them red">
+          All Red
+        </button>
+        <button onclick="clearAllRedRewards()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-bold transition" title="Clear all red deactivated rewards">
+          Clear Red
+        </button>
+      </div>
+    </div>
+
+    <!-- Collapsible Settings & Custom Simulator Drawer -->
+    <div id="settingsDrawer" class="hidden pt-2.5 border-t border-slate-800 space-y-3 bg-[#080c14] p-3 rounded-2xl">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <!-- Streamer.bot WebSocket URL -->
+        <div>
+          <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Streamer.bot WebSocket URL</label>
+          <div class="flex gap-1.5">
+            <input type="text" id="cfgWsUrl" value="ws://127.0.0.1:8080/" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-mono text-emerald-300" />
+            <button onclick="connectWebSocket(true)" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">Connect</button>
+          </div>
+        </div>
+
+        <!-- Non-Timed Green Hold Duration (Default 120s) -->
+        <div>
+          <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Non-Timed Green Hold Seconds</label>
+          <div class="flex items-center gap-2">
+            <input type="number" id="cfgGreenHoldSec" value="120" min="5" max="3600" onchange="updateDockSettings()" class="w-24 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-white text-center" />
+            <span class="text-[11px] text-slate-400">seconds before turning Red</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom Test Trigger Box -->
+      <div class="pt-2 border-t border-slate-800/80 space-y-2">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Custom Reward Simulator</div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input type="text" id="simUser" value="KaiCenatLive" placeholder="Username" class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white" />
+          <input type="text" id="simTitle" value="No HUD & Invert Mouse" placeholder="Reward Name" class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-semibold sm:col-span-2" />
+        </div>
+        <div class="flex gap-2">
+          <input type="text" id="simDesc" value="Turn off HUD and invert mouse for 5 minutes! (5:00)" placeholder="Description — add (5:00) or (1:00:00) for timer, or leave without timer for 120s green" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200" />
+          <button onclick="fireCustomTest()" class="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shrink-0">
+            Trigger
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </header>
+
+  <!-- MAIN REWARDS DOCK FEED (Active Green Bubbles on Top, Deactivated Red Bubbles Below) -->
+  <main id="obsDockRewardsList" class="flex-1 overflow-y-auto p-2 space-y-1.5 max-w-4xl w-full mx-auto"></main>
+
+  <!-- DOCK FOOTER BAR -->
+  <footer class="px-3 py-1.5 bg-[#0a0e17] border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 shrink-0">
+    <span>
+      <i class="fa-solid fa-hand-pointer text-emerald-400 mr-1"></i>
+      Hover any <strong class="text-emerald-300">Green Bubble</strong> & click <strong class="text-rose-300">Dismiss</strong> to turn Red
+    </span>
+    <span class="font-mono text-[10px] text-slate-500 hidden sm:inline">Active Green Pinned to Top</span>
+  </footer>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastBanner" class="fixed bottom-12 right-4 z-50 pointer-events-none opacity-0 translate-y-2 transition-all duration-300">
+    <div class="bg-slate-900/95 border border-emerald-500/50 text-white px-3.5 py-2 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-bold">
+      <i class="fa-solid fa-circle-check text-emerald-400"></i>
+      <span id="toastMessage">Updated</span>
+    </div>
+  </div>
+
+  <script>
+    /*************************************************************************
+     * 1. DOCK CONFIGURATION & STATE
+     *************************************************************************/
+    const DOCK_CONFIG = {
+      wsUrl: "ws://127.0.0.1:8080/",
+      noTimerGreenSeconds: 120
+    };
+
+    // Each reward item:
+    // {
+    //   id, redemptionId, platform, user, avatar, title, description,
+    //   hasTimer, totalSec, remainingSec,
+    //   status: 'active' | 'deactivated',
+    //   deactivatedReason: '',
+    //   createdAt: timestamp,
+    //   activatedAtText: '5:25:14 PM'
+    // }
+    let dockRewards = [];
+    let dockLoopInterval = null;
+    let wsClient = null;
+
+    /*************************************************************************
+     * 2. TIME & DESCRIPTION TIMER PARSER HELPERS
+     * Scans description (and title fallback) for (5:00), (1:00:00), or (1:0:0)
+     *************************************************************************/
+    function formatActivatedTimestamp(dateObj = new Date()) {
+      return dateObj.toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+
+    function parseRewardTimerFromDescription(descriptionText, titleFallback = "") {
+      const combined = `${descriptionText || ""} ${titleFallback || ""}`.trim();
+      if (!combined) return null;
+
+      const endRegex = /\(\s*(\d+)\s*:\s*(\d+)(?:\s*:\s*(\d+))?\s*\)\s*$/;
+      const anyRegex = /\(\s*(\d+)\s*:\s*(\d+)(?:\s*:\s*(\d+))?\s*\)/;
+
+      const match = (descriptionText && descriptionText.match(endRegex))
+        || (descriptionText && descriptionText.match(anyRegex))
+        || combined.match(endRegex)
+        || combined.match(anyRegex);
+
+      if (!match) return null;
+
+      let hours = 0, minutes = 0, seconds = 0;
+      if (match[3] !== undefined) {
+        hours = parseInt(match[1], 10) || 0;
+        minutes = parseInt(match[2], 10) || 0;
+        seconds = parseInt(match[3], 10) || 0;
+      } else {
+        minutes = parseInt(match[1], 10) || 0;
+        seconds = parseInt(match[2], 10) || 0;
+      }
+
+      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+      return totalSeconds > 0 ? totalSeconds : null;
+    }
+
+    function formatClockReadout(sec) {
+      const s = Math.max(0, Math.floor(sec));
+      const hrs = Math.floor(s / 3600);
+      const mins = Math.floor((s % 3600) / 60);
+      const secs = s % 60;
+      if (hrs > 0) {
+        return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str || "").replace(/[&<>"']/g, s => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[s]));
+    }
+
+    /*************************************************************************
+     * 3. ADD, SORT, COUNTDOWN & DISMISS REWARDS
+     *************************************************************************/
+    async function resolveTwitchAvatar(platform, userLogin, currentAvatar) {
+      if (currentAvatar && currentAvatar.startsWith("http") && !currentAvatar.includes("unavatar.io")) {
+        return currentAvatar;
+      }
+      if (platform === "twitch" && userLogin && userLogin !== "Viewer") {
+        try {
+          const resp = await fetch(`https://decapi.me/twitch/avatar/${encodeURIComponent(userLogin)}`);
+          if (resp.ok) {
+            const txt = (await resp.text()).trim();
+            if (txt.startsWith("http")) return txt;
+          }
+        } catch (e) {}
+      }
+      return currentAvatar || `https://unavatar.io/${platform}/${encodeURIComponent(userLogin || "streamer")}`;
+    }
+
+    async function addRewardToDock(payload) {
+      const platform = (payload.platform || "twitch").toLowerCase();
+      const user = payload.user || "Viewer";
+      const userLogin = payload.userLogin || user;
+      const title = payload.title || "Channel Point Reward";
+      const description = payload.description !== undefined ? payload.description : "";
+
+      const parsedSeconds = Number(payload.durationSeconds) || parseRewardTimerFromDescription(description, title) || 0;
+      const hasTimer = parsedSeconds > 0;
+      const totalSec = hasTimer ? parsedSeconds : DOCK_CONFIG.noTimerGreenSeconds;
+
+      const now = new Date();
+      const activatedAtText = payload.activatedAtText || formatActivatedTimestamp(now);
+      const avatar = await resolveTwitchAvatar(platform, userLogin, payload.avatar);
+
+      const dockItem = {
+        id: "dock_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        redemptionId: payload.redemptionId || ("r_" + Date.now()),
+        platform,
+        user,
+        avatar,
+        title,
+        description,
+        hasTimer,
+        totalSec,
+        remainingSec: totalSec,
+        status: "active", // 'active' (Green Bubble) or 'deactivated' (Red Bubble)
+        deactivatedReason: "",
+        createdAt: now.getTime(),
+        activatedAtText
+      };
+
+      // Insert at the top so newest rewards push older rewards down
+      dockRewards.unshift(dockItem);
+      sortAndRenderDock(dockItem.id);
+      ensureDockCountdownLoop();
+    }
+
+    function sortDockRewards() {
+      // Keep all Green ('active') rewards at the top (newest first),
+      // pushing all Red ('deactivated') rewards below them (newest first)
+      dockRewards.sort((a, b) => {
+        if (a.status === "active" && b.status !== "active") return -1;
+        if (a.status !== "active" && b.status === "active") return 1;
+        return b.createdAt - a.createdAt;
+      });
+    }
+
+    function ensureDockCountdownLoop() {
+      if (dockLoopInterval) return;
+      dockLoopInterval = setInterval(() => {
+        const activeList = dockRewards.filter(r => r.status === "active");
+        if (activeList.length === 0) {
+          clearInterval(dockLoopInterval);
+          dockLoopInterval = null;
+          return;
+        }
+
+        let anyTurnedRed = false;
+        activeList.forEach(item => {
+          item.remainingSec = Math.max(0, item.remainingSec - 1);
+          updateSingleDockCardDOM(item);
+
+          if (item.remainingSec <= 0) {
+            item.status = "deactivated";
+            item.deactivatedReason = item.hasTimer
+              ? "Timer Finished (00:00)"
+              : `${DOCK_CONFIG.noTimerGreenSeconds}s Auto-Expired`;
+            anyTurnedRed = true;
+          }
+        });
+
+        if (anyTurnedRed) {
+          sortAndRenderDock();
+        }
+      }, 1000);
+    }
+
+    function updateSingleDockCardDOM(item) {
+      const clockEl = document.getElementById(`dock-clock-${item.id}`);
+      if (clockEl) {
+        clockEl.textContent = item.hasTimer
+          ? formatClockReadout(item.remainingSec)
+          : `${item.remainingSec}s`;
+      }
+      const barEl = document.getElementById(`dock-bar-${item.id}`);
+      if (barEl) {
+        const pct = Math.max(0, Math.min(100, (item.remainingSec / item.totalSec) * 100));
+        barEl.style.width = `${pct}%`;
+      }
+    }
+
+    function dismissRewardToRed(dockId) {
+      const target = dockRewards.find(r => r.id === dockId);
+      if (!target || target.status === "deactivated") return;
+
+      target.status = "deactivated";
+      target.remainingSec = 0;
+      target.deactivatedReason = `Dismissed at ${formatActivatedTimestamp(new Date())}`;
+
+      sortAndRenderDock();
+      showToast(`"${target.title}" marked Not Active (Red)`);
+    }
+
+    function reactivateRewardToGreen(dockId) {
+      const target = dockRewards.find(r => r.id === dockId);
+      if (!target) return;
+
+      target.status = "active";
+      target.remainingSec = target.totalSec || DOCK_CONFIG.noTimerGreenSeconds;
+      target.createdAt = Date.now();
+      target.activatedAtText = formatActivatedTimestamp(new Date());
+      target.deactivatedReason = "";
+
+      sortAndRenderDock(target.id);
+      ensureDockCountdownLoop();
+      showToast(`"${target.title}" reactivated (Green)`);
+    }
+
+    function deleteRewardCard(dockId) {
+      dockRewards = dockRewards.filter(r => r.id !== dockId);
+      sortAndRenderDock();
+    }
+
+    function dismissAllGreenRewards() {
+      let count = 0;
+      const nowStr = formatActivatedTimestamp(new Date());
+      dockRewards.forEach(r => {
+        if (r.status === "active") {
+          r.status = "deactivated";
+          r.remainingSec = 0;
+          r.deactivatedReason = `Dismissed at ${nowStr}`;
+          count++;
+        }
+      });
+      if (count > 0) {
+        sortAndRenderDock();
+        showToast(`Turned ${count} active reward${count === 1 ? '' : 's'} Red.`);
+      }
+    }
+
+    function clearAllRedRewards() {
+      dockRewards = dockRewards.filter(r => r.status === "active");
+      sortAndRenderDock();
+    }
+
+    /*************************************************************************
+     * 4. RENDER DOCK CARDS (GREEN ACTIVE BUBBLES ON TOP, RED BELOW)
+     *************************************************************************/
+    function sortAndRenderDock(newlyAddedId = null) {
+      sortDockRewards();
+
+      const listEl = document.getElementById("obsDockRewardsList");
+      if (!listEl) return;
+
+      const greenCount = dockRewards.filter(r => r.status === "active").length;
+      const redCount = dockRewards.filter(r => r.status === "deactivated").length;
+
+      const gBadge = document.getElementById("dockGreenCounter");
+      if (gBadge) gBadge.textContent = `${greenCount} Active`;
+      const rBadge = document.getElementById("dockRedCounter");
+      if (rBadge) rBadge.textContent = `${redCount} Not Active`;
+
+      if (dockRewards.length === 0) {
+        listEl.innerHTML = `
+          <div class="h-64 rounded-3xl border border-dashed border-slate-800 flex flex-col items-center justify-center text-center p-6 text-slate-400">
+            <i class="fa-solid fa-bolt text-3xl text-emerald-400/50 mb-3"></i>
+            <p class="text-sm font-bold text-slate-200">Waiting for Twitch or Kick Channel Rewards...</p>
+            <p class="text-xs text-slate-400 mt-1 max-w-md">
+              New rewards appear at the top as <strong class="text-emerald-300">Green Bubbles</strong> showing the time activated, reward name, and description. Timed rewards play an <strong class="text-teal-300">Idle Effect</strong> while running, and non-timed rewards stay green for 120 seconds before turning <strong class="text-rose-300">Red</strong>.
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = dockRewards.map(item => {
+        const isGreen = item.status === "active";
+        const isTimedIdle = isGreen && item.hasTimer;
+        const pct = Math.max(0, Math.min(100, (item.remainingSec / item.totalSec) * 100));
+        const isKick = item.platform === "kick";
+        const platBadge = isKick
+          ? `<span class="px-1 py-0.2 rounded bg-[#53FC18] text-black font-black text-[9px] uppercase tracking-wider leading-tight">KICK</span>`
+          : `<span class="px-1 py-0.2 rounded bg-[#9146FF] text-white font-bold text-[9px] uppercase tracking-wider leading-tight">TWITCH</span>`;
+
+        const enterAnimClass = item.id === newlyAddedId ? "dock-item-enter" : "";
+
+        if (isGreen) {
+          // COMPACT ACTIVE GREEN BUBBLE
+          return `
+            <div id="dock-card-${item.id}" class="group relative overflow-hidden rounded-xl px-2.5 py-2 transition-all duration-200 dock-bubble-green ${isTimedIdle ? 'dock-bubble-green-idle dock-idle-shimmer' : ''} ${enterAnimClass}">
+              
+              <!-- HOVER DISMISS BUTTON (Immediately turns Green Bubble Red as Not Active) -->
+              <div class="absolute top-1.5 right-2 z-20 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+                <button onclick="dismissRewardToRed('${item.id}')"
+                        class="px-2.5 py-1 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-black uppercase tracking-wide shadow-lg border border-rose-300/70 flex items-center gap-1 transform hover:scale-105 transition">
+                  <i class="fa-solid fa-ban text-[9px]"></i>
+                  <span>Dismiss • Turn Red</span>
+                </button>
+              </div>
+
+              <!-- Top Metadata Row: Status, Platform, User & Activated Time -->
+              <div class="flex items-center justify-between gap-1.5 flex-wrap mb-1 relative z-10">
+                <div class="flex items-center gap-1.5 min-w-0 flex-wrap">
+                  <span class="relative flex h-2 w-2 shrink-0">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-80"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                  </span>
+                  <span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-300/40">
+                    ACTIVE
+                  </span>
+                  ${platBadge}
+                  <div class="flex items-center gap-1 min-w-0">
+                    <img src="${escapeHtml(item.avatar)}"
+                         onerror="this.src='https://placehold.co/40x40/064e3b/ffffff?text=U'"
+                         class="w-4 h-4 rounded-full object-cover border border-emerald-300/70 shrink-0" />
+                    <span class="text-[11px] font-bold text-emerald-100 truncate max-w-[110px]">${escapeHtml(item.user)}</span>
+                  </div>
+
+                  <!-- ACTIVATED TIME STAMP -->
+                  <span class="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-black/35 text-emerald-200 border border-emerald-400/30 flex items-center gap-1" title="Time this reward was activated">
+                    <i class="fa-regular fa-clock text-[9px] text-emerald-300"></i>
+                    <span>${escapeHtml(item.activatedAtText)}</span>
+                  </span>
+                </div>
+
+                <!-- Right Countdown Pill (Running Timer with IDLE Badge OR 120s Hold Countdown) -->
+                <div class="shrink-0">
+                  ${item.hasTimer ? `
+                    <div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/45 border border-emerald-300/50 text-emerald-200 font-mono-tech text-[11px] font-black shadow-inner">
+                      <i class="fa-solid fa-hourglass-half animate-spin text-emerald-300 text-[9px]" style="animation-duration: 3s;"></i>
+                      <span id="dock-clock-${item.id}">${formatClockReadout(item.remainingSec)}</span>
+                      <span class="text-[8px] uppercase tracking-wider px-1 py-0.2 rounded bg-emerald-400/25 text-emerald-200 font-sans">IDLE</span>
+                    </div>
+                  ` : `
+                    <div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/35 border border-emerald-400/35 text-emerald-200 font-mono-tech text-[10px] font-bold" title="Turns Red automatically after ${item.totalSec} seconds">
+                      <i class="fa-solid fa-bolt text-[9px] text-emerald-300"></i>
+                      <span id="dock-clock-${item.id}">${item.remainingSec}s</span>
+                    </div>
+                  `}
+                </div>
+              </div>
+
+              <!-- REWARD NAME ON TOP -->
+              <h2 class="text-xs sm:text-sm font-black text-white leading-tight break-words relative z-10">
+                ${escapeHtml(item.title)}
+              </h2>
+
+              <!-- REWARD DESCRIPTION UNDER TITLE -->
+              ${item.description ? `
+                <p class="text-[11px] text-emerald-100/90 mt-0.5 leading-snug break-words relative z-10">
+                  ${escapeHtml(item.description)}
+                </p>
+              ` : ''}
+
+              <!-- Live Progress Bar -->
+              <div class="w-full h-1 bg-black/45 rounded-full overflow-hidden mt-1.5 relative z-10">
+                <div id="dock-bar-${item.id}" class="h-full rounded-full transition-all duration-500"
+                     style="width: ${pct}%; background: linear-gradient(90deg, #34d399, #a7f3d0);"></div>
+              </div>
+            </div>
+          `;
+        } else {
+          // COMPACT DEACTIVATED RED BUBBLE
+          return `
+            <div id="dock-card-${item.id}" class="group relative overflow-hidden rounded-xl px-2.5 py-1.5 transition-all duration-200 dock-bubble-red opacity-90 hover:opacity-100">
+              
+              <!-- Hover Controls on Red Bubble (Reactivate or Remove) -->
+              <div class="absolute top-1.5 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center gap-1">
+                <button onclick="reactivateRewardToGreen('${item.id}')"
+                        class="px-2 py-0.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow border border-emerald-300/50 flex items-center gap-1" title="Reactivate as Green Bubble">
+                  <i class="fa-solid fa-rotate-left text-[9px]"></i> Turn Green
+                </button>
+                <button onclick="deleteRewardCard('${item.id}')"
+                        class="w-5 h-5 rounded-full bg-slate-900/90 hover:bg-rose-700 text-rose-200 text-[10px] flex items-center justify-center border border-rose-400/40" title="Remove from Dock">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              <!-- Top Metadata Row: Not Active Badge, Platform, User & Activated Time -->
+              <div class="flex items-center justify-between gap-1.5 flex-wrap mb-0.5">
+                <div class="flex items-center gap-1.5 min-w-0 flex-wrap">
+                  <span class="inline-flex rounded-full h-2 w-2 bg-rose-500 shrink-0 shadow-[0_0_6px_#f43f5e]"></span>
+                  <span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-rose-500/25 text-rose-200 border border-rose-400/40">
+                    NOT ACTIVE
+                  </span>
+                  ${platBadge}
+                  <div class="flex items-center gap-1 min-w-0">
+                    <img src="${escapeHtml(item.avatar)}"
+                         onerror="this.src='https://placehold.co/40x40/4c0519/ffffff?text=U'"
+                         class="w-4 h-4 rounded-full object-cover border border-rose-300/50 shrink-0" />
+                    <span class="text-[11px] font-bold text-rose-100 truncate max-w-[110px]">${escapeHtml(item.user)}</span>
+                  </div>
+
+                  <!-- ACTIVATED TIME STAMP -->
+                  <span class="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-black/35 text-rose-200 border border-rose-400/30 flex items-center gap-1" title="Time this reward was originally activated">
+                    <i class="fa-regular fa-clock text-[9px] text-rose-300"></i>
+                    <span>${escapeHtml(item.activatedAtText)}</span>
+                  </span>
+                </div>
+
+                <span class="text-[10px] font-mono text-rose-300/90 shrink-0">
+                  ${escapeHtml(item.deactivatedReason || "Expired")}
+                </span>
+              </div>
+
+              <!-- REWARD NAME ON TOP -->
+              <h2 class="text-xs sm:text-sm font-extrabold text-rose-100 leading-tight break-words">
+                ${escapeHtml(item.title)}
+              </h2>
+
+              <!-- REWARD DESCRIPTION UNDER TITLE -->
+              ${item.description ? `
+                <p class="text-[11px] text-rose-200/80 mt-0.5 leading-snug break-words">
+                  ${escapeHtml(item.description)}
+                </p>
+              ` : ''}
+            </div>
+          `;
+        }
+      }).join("");
+    }
+
+    /*************************************************************************
+     * 5. STREAMER.BOT WEBSOCKET CONNECTION (TWITCH & KICK REWARDS)
+     *************************************************************************/
+    function connectWebSocket(showSuccessToast = false) {
+      const urlInput = document.getElementById("cfgWsUrl");
+      if (urlInput && urlInput.value.trim()) {
+        DOCK_CONFIG.wsUrl = urlInput.value.trim();
+      }
+
+      if (wsClient) {
+        try { wsClient.close(); } catch (e) {}
+      }
+
+      updateWsPill("connecting", `WS: Connecting (${DOCK_CONFIG.wsUrl})...`);
+
+      try {
+        wsClient = new WebSocket(DOCK_CONFIG.wsUrl);
+
+        wsClient.onopen = () => {
+          updateWsPill("connected", `WS: Connected (${DOCK_CONFIG.wsUrl})`);
+          if (showSuccessToast) showToast("Connected to Streamer.bot WebSocket!");
+
+          wsClient.send(JSON.stringify({
+            request: "Subscribe",
+            id: "obs_reward_dock_sub",
+            events: {
+              Twitch: ["RewardRedemption"],
+              Kick: ["RewardRedemption"],
+              General: ["Custom"]
+            }
+          }));
+        };
+
+        wsClient.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            handleStreamerBotMessage(msg);
+          } catch (err) {}
+        };
+
+        wsClient.onerror = () => {
+          updateWsPill("standby", `WS: Standby (${DOCK_CONFIG.wsUrl})`);
+        };
+
+        wsClient.onclose = () => {
+          updateWsPill("standby", `WS: Standby (${DOCK_CONFIG.wsUrl})`);
+        };
+      } catch (e) {
+        updateWsPill("standby", "WS: Connection Error");
+      }
+    }
+
+    function handleStreamerBotMessage(msg) {
+      if (!msg.event || !msg.data) return;
+      const source = (msg.event.source || "").toLowerCase();
+      const type = (msg.event.type || "").toLowerCase();
+      const d = msg.data;
+
+      // 1. Custom Broadcast Payload
+      const customPayload = (d.overlayType === "channelRewardAlert" || d.eventName === "RewardStudio.Redemption")
+        ? d
+        : ((d.data && (d.data.overlayType === "channelRewardAlert" || d.data.eventName === "RewardStudio.Redemption")) ? d.data : null);
+
+      if (customPayload) {
+        addRewardToDock({
+          redemptionId: customPayload.redemptionId || ("cs_" + Date.now()),
+          platform: customPayload.platform || "twitch",
+          user: customPayload.user || customPayload.userName || "Viewer",
+          userLogin: customPayload.userLogin || customPayload.user || "",
+          avatar: customPayload.avatar || "",
+          title: customPayload.title || customPayload.rewardTitle || "Channel Reward",
+          description: customPayload.description !== undefined ? customPayload.description : (customPayload.rewardPrompt || ""),
+          durationSeconds: Number(customPayload.durationSeconds) || 0
+        });
+        return;
+      }
+
+      // 2. Native Twitch / Kick RewardRedemption Event
+      if (type === "rewardredemption") {
+        const redemptionObj = d.redemption || d;
+        const rewardObj = redemptionObj.reward || d.reward || {};
+        const userObj = redemptionObj.user || d.user || {};
+
+        const platform = source.includes("kick") ? "kick" : "twitch";
+        const user = redemptionObj.user_name || d.user_name || userObj.display_name || userObj.name || userObj.username || d.userName || "Viewer";
+        const userLogin = redemptionObj.user_login || d.user_login || userObj.login || userObj.username || user;
+        const avatar = d.user_avatar || userObj.profile_image_url || userObj.avatar || d.targetUserProfileImageUrl || "";
+        const title = rewardObj.title || d.reward_title || d.rewardName || d.title || "Channel Reward";
+
+        const promptParts = [];
+        const rawPrompt = rewardObj.prompt || rewardObj.description || d.prompt || d.rewardPrompt || d.reward_prompt || "";
+        const userInput = redemptionObj.user_input || d.user_input || d.rawInput || d.userInput || d.message || "";
+        if (rawPrompt) promptParts.push(rawPrompt);
+        if (userInput && userInput !== rawPrompt) promptParts.push(userInput);
+
+        addRewardToDock({
+          redemptionId: redemptionObj.id || d.id || ("nat_" + Date.now()),
+          platform,
+          user,
+          userLogin,
+          avatar,
+          title,
+          description: promptParts.join(" - ")
+        });
+      }
+    }
+
+    function updateWsPill(state, text) {
+      const dot = document.getElementById("wsDot");
+      const label = document.getElementById("wsStatusText");
+      if (!dot || !label) return;
+      label.textContent = text;
+      dot.className = "w-2 h-2 rounded-full ";
+      if (state === "connected") {
+        dot.className += "bg-emerald-400 shadow-[0_0_8px_#34d399]";
+      } else if (state === "connecting") {
+        dot.className += "bg-cyan-400 animate-ping";
+      } else {
+        dot.className += "bg-amber-400 animate-pulse";
+      }
+    }
+
+    /*************************************************************************
+     * 6. UI CONTROLS, SIMULATOR & STANDALONE DOCK DOWNLOAD
+     *************************************************************************/
+    function toggleSettingsDrawer() {
+      const drawer = document.getElementById("settingsDrawer");
+      if (drawer) drawer.classList.toggle("hidden");
+    }
+
+    function updateDockSettings() {
+      const holdEl = document.getElementById("cfgGreenHoldSec");
+      if (holdEl) {
+        DOCK_CONFIG.noTimerGreenSeconds = Math.max(5, parseInt(holdEl.value, 10) || 120);
+      }
+      showToast(`Non-timed rewards will stay Green for ${DOCK_CONFIG.noTimerGreenSeconds}s`);
+    }
+
+    function triggerTestReward(kind) {
+      if (kind === "timed") {
+        addRewardToDock({
+          platform: "twitch",
+          user: "ShroudTTV",
+          avatar: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=160&auto=format&fit=crop&q=80",
+          title: "Hydrate & Posture Check!",
+          description: "Take a sip of water and sit up straight! (5:00)"
+        });
+      } else {
+        addRewardToDock({
+          platform: "kick",
+          user: "NeonSniper",
+          avatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=160&auto=format&fit=crop&q=80",
+          title: "Drop Primary Weapon",
+          description: "Drop your current primary weapon on the ground immediately!"
+        });
+      }
+    }
+
+    function fireCustomTest() {
+      const user = document.getElementById("simUser").value.trim() || "StreamFan";
+      const title = document.getElementById("simTitle").value.trim() || "Custom Reward";
+      const description = document.getElementById("simDesc").value.trim();
+      addRewardToDock({
+        platform: "twitch",
+        user,
+        title,
+        description
+      });
+    }
+
+    function downloadStandaloneDockFile() {
+      const htmlSource = document.documentElement.outerHTML;
+      const blob = new Blob(["<!DOCTYPE html>\n" + htmlSource], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "streamerbot-obs-reward-dock.html";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Saved streamerbot-obs-reward-dock.html for OBS Custom Browser Docks!");
+    }
+
+    function showToast(msg) {
+      const banner = document.getElementById("toastBanner");
+      const text = document.getElementById("toastMessage");
+      if (!banner || !text) return;
+      text.textContent = msg;
+      banner.classList.remove("opacity-0", "translate-y-2");
+      banner.classList.add("opacity-100", "translate-y-0");
+      setTimeout(() => {
+        banner.classList.add("opacity-0", "translate-y-2");
+        banner.classList.remove("opacity-100", "translate-y-0");
+      }, 2800);
+    }
+
+    /*************************************************************************
+     * 7. INITIALIZE DOCK ON LOAD
+     *************************************************************************/
+    window.onload = function () {
+      connectWebSocket(false);
+      sortAndRenderDock();
+    };
+  </script>
+</body>
+</html>
